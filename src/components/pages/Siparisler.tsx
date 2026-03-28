@@ -157,14 +157,12 @@ function HizliMusteriModal({ koyler, onKaydet, onKapat }: HizliMusteriModalProps
   const [koyAra, setKoyAra] = useState('');
   const [koySecili, setKoySecili] = useState('');
   const [showDd, setShowDd] = useState(false);
-  // Yeni köy için mesafe sorusu
   const [yeniKoyBolge, setYeniKoyBolge] = useState<'yakin' | 'uzak' | null>(null);
 
   const filtreKoyler = koyler.filter(k =>
     !koyAra || k.isim.toLowerCase().includes(koyAra.toLowerCase())
   );
 
-  // Girilen isim listede yok mu?
   const koyListedeYok = koyAra.trim() !== '' && !koyler.find(k => k.isim.toLowerCase() === koyAra.trim().toLowerCase());
 
   function handleKoyAraChange(val: string) {
@@ -241,7 +239,6 @@ function HizliMusteriModal({ koyler, onKaydet, onKapat }: HizliMusteriModalProps
           </div>
         </div>
 
-        {/* Yeni köy — mesafe sorusu */}
         {koyListedeYok && !koySecili && (
           <div style={{ background: 'rgba(246,201,14,.08)', border: '1px solid rgba(246,201,14,.35)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 4 }}>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
@@ -282,6 +279,124 @@ function HizliMusteriModal({ koyler, onKaydet, onKapat }: HizliMusteriModalProps
           >
             ✓ Ekle
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sipariş Düzenleme Modal ───────────────────────────────────────────────────
+interface DuzenleModalProps {
+  siparis: Siparis;
+  onKaydet: (guncellendi: Siparis) => void;
+  onKapat: () => void;
+}
+
+function SiparisDuzenleModal({ siparis, onKaydet, onKapat }: DuzenleModalProps) {
+  const [adet, setAdet]   = useState(String(siparis.adet));
+  const [fiyat, setFiyat] = useState(String(siparis.fiyat));
+  const [not, setNot]     = useState(siparis.not || '');
+
+  function kaydet() {
+    const yeniAdet  = parseFloat(adet);
+    const yeniFiyat = parseFloat(fiyat);
+    if (!yeniAdet || yeniAdet <= 0)  return;
+    if (!yeniFiyat || yeniFiyat <= 0) return;
+    // Gonderilen yeni adetten fazla olamaz
+    const yeniGonderilen = Math.min(siparis.gonderilen, yeniAdet);
+    onKaydet({
+      ...siparis,
+      adet: yeniAdet,
+      fiyat: yeniFiyat,
+      toplamTutar: yeniAdet * yeniFiyat,
+      gonderilen: yeniGonderilen,
+      not,
+    });
+  }
+
+  return (
+    <div className="modal-overlay open" onClick={e => { if (e.target === e.currentTarget) onKapat(); }}>
+      <div className="modal" style={{ width: 400 }}>
+        <div className="modal-title">Sipariş Düzenle</div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 14, padding: '0 4px' }}>
+          <strong>{SIP_CESIT_LABEL[siparis.cesit] || siparis.cesit}</strong>
+          {siparis.koy && <span style={{ marginLeft: 8, color: 'var(--text3)' }}>📍 {siparis.koy}</span>}
+        </div>
+        {siparis.gonderilen > 0 && (
+          <div style={{ background: 'rgba(246,201,14,.1)', border: '1px solid rgba(246,201,14,.4)', borderRadius: 'var(--radius)', padding: '8px 12px', marginBottom: 12, fontSize: 12, color: 'var(--text2)' }}>
+            ⚠️ Bu siparişten <strong>{siparis.gonderilen.toLocaleString('tr-TR')}</strong> adet zaten gönderildi.
+            Miktarı bunun altına düşüremezsiniz.
+          </div>
+        )}
+        <div className="frow c2">
+          <div>
+            <label>Miktar ({siparis.birim || 'adet'})</label>
+            <input
+              type="number"
+              value={adet}
+              min={siparis.gonderilen || 1}
+              onChange={e => setAdet(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label>Birim Fiyat (TL)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={fiyat}
+              onChange={e => setFiyat(e.target.value)}
+            />
+          </div>
+        </div>
+        {parseFloat(adet) > 0 && parseFloat(fiyat) > 0 && (
+          <div style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace', marginBottom: 10, paddingLeft: 2 }}>
+            Toplam: {tl(parseFloat(adet) * parseFloat(fiyat))}
+          </div>
+        )}
+        <div className="frow">
+          <div>
+            <label>Not</label>
+            <textarea value={not} onChange={e => setNot(e.target.value)} placeholder="İsteğe bağlı..." />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onKapat}>İptal</button>
+          <button
+            className="btn btn-primary"
+            onClick={kaydet}
+            disabled={
+              !parseFloat(adet) || parseFloat(adet) <= 0 ||
+              !parseFloat(fiyat) || parseFloat(fiyat) <= 0 ||
+              parseFloat(adet) < siparis.gonderilen
+            }
+          >
+            ✓ Kaydet
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Onay Modal ───────────────────────────────────────────────────────────────
+interface OnayModalProps {
+  mesaj: string;
+  onOnayla: () => void;
+  onIptal: () => void;
+}
+
+function OnayModal({ mesaj, onOnayla, onIptal }: OnayModalProps) {
+  return (
+    <div className="modal-overlay open" onClick={e => { if (e.target === e.currentTarget) onIptal(); }}>
+      <div className="modal" style={{ width: 380 }}>
+        <div className="modal-title">Silme Onayı</div>
+        <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 20, lineHeight: 1.5 }}>
+          {mesaj}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onIptal}>İptal</button>
+          <button className="btn btn-danger" onClick={onOnayla}>Sil</button>
         </div>
       </div>
     </div>
@@ -335,6 +450,11 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
   const [urunler, setUrunler]     = useState<UrunSatiri[]>([{ cesit: '20lik', adet: '', fiyat: varsayilanFiyat('20lik', 'merkez', data) }]);
   const [oncelik, setOncelik]     = useState<'normal' | 'acil'>('normal');
   const [showHizliMusteri, setShowHizliMusteri] = useState(false);
+
+  // Düzenleme ve silme modalleri
+  const [duzenlenecek, setDuzenlenecek]   = useState<Siparis | null>(null);
+  const [silinecekId, setSilinecekId]     = useState<number | null>(null);
+  const [silinecekMesaj, setSilinecekMesaj] = useState('');
 
   // Teslimat formu
   const teslimatFormRef = useRef<HTMLDivElement>(null);
@@ -429,9 +549,30 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
     showToast(gecerli.length > 1 ? `${gecerli.length} sipariş eklendi ✓` : 'Sipariş eklendi ✓');
   }
 
-  function siparisSil(id: number) {
-    onSave({ ...data, siparisler: data.siparisler.filter(s => s.id !== id) });
+  // ─── Silme (onaylı) ───────────────────────────────────────────────────────
+  function siparisSilOnay(s: Siparis, musteriIsim: string) {
+    setSilinecekId(s.id);
+    setSilinecekMesaj(
+      `"${musteriIsim}" müşterisine ait ${SIP_CESIT_LABEL[s.cesit] || s.cesit} siparişi (${s.adet.toLocaleString('tr-TR')} ${s.birim || 'adet'}) silinecek. Bu işlem geri alınamaz.`
+    );
+  }
+
+  function siparisSilOnayla() {
+    if (silinecekId === null) return;
+    onSave({ ...data, siparisler: data.siparisler.filter(s => s.id !== silinecekId) });
+    setSilinecekId(null);
+    setSilinecekMesaj('');
     showToast('Sipariş silindi');
+  }
+
+  // ─── Düzenleme ────────────────────────────────────────────────────────────
+  function siparisDuzenleKaydet(guncellendi: Siparis) {
+    onSave({
+      ...data,
+      siparisler: data.siparisler.map(s => s.id === guncellendi.id ? guncellendi : s),
+    });
+    setDuzenlenecek(null);
+    showToast('Sipariş güncellendi ✓');
   }
 
   // ─── Hızlı müşteri ────────────────────────────────────────────────────────
@@ -542,24 +683,33 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
     !koyAra || k.isim.toLowerCase().includes(koyAra.toLowerCase())
   );
 
+  // ─── Sipariş grupları: tüm kalemleri tamamlanmış gruplar LİSTEDEN DÜŞER ──
+  // Not: data.siparisler'den SİLMİYORUZ — teslimat geçmişi bağlantısı korunur.
   const sipGruplari = useMemo(() => {
     const map = new Map<number, Siparis[]>();
     for (const s of data.siparisler) {
       if (!map.has(s.musteriId)) map.set(s.musteriId, []);
       map.get(s.musteriId)!.push(s);
     }
-    return Array.from(map.entries()).sort((a, b) => {
-      // Acil olanlar her zaman en üste
-      const aAcil = a[1].some(s => (s as Siparis & { oncelik?: string }).oncelik === 'acil') ? 0 : 1;
-      const bAcil = b[1].some(s => (s as Siparis & { oncelik?: string }).oncelik === 'acil') ? 0 : 1;
-      if (aAcil !== bAcil) return aAcil - bAcil;
-      // Sonra sipSiralama'ya göre
-      const aId = Math.max(...a[1].map(s => s.id));
-      const bId = Math.max(...b[1].map(s => s.id));
-      if (sipSiralama === 'eski') return aId - bId;
-      return bId - aId; // varsayılan: yeni önce
-    });
+    return Array.from(map.entries())
+      // Grubun en az 1 kalemi hâlâ açıksa listede göster
+      .filter(([, kalemler]) => kalemler.some(s => s.gonderilen < s.adet))
+      .sort((a, b) => {
+        const aAcil = a[1].some(s => (s as Siparis & { oncelik?: string }).oncelik === 'acil') ? 0 : 1;
+        const bAcil = b[1].some(s => (s as Siparis & { oncelik?: string }).oncelik === 'acil') ? 0 : 1;
+        if (aAcil !== bAcil) return aAcil - bAcil;
+        const aId = Math.max(...a[1].map(s => s.id));
+        const bId = Math.max(...b[1].map(s => s.id));
+        if (sipSiralama === 'eski') return aId - bId;
+        return bId - aId;
+      });
   }, [data.siparisler, sipSiralama]);
+
+  // Toplam açık sipariş sayısını header'da göstermek için
+  const toplamAcikKalem = useMemo(
+    () => data.siparisler.filter(s => s.gonderilen < s.adet).length,
+    [data.siparisler]
+  );
 
   function toggleSipGrup(musteriId: number) {
     setAcikSipGruplari(prev => {
@@ -618,6 +768,7 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
   }
 
   function sipDurumBadge(kalemler: Siparis[]) {
+    // Bu fonksiyon artık sadece açık kalemler için çağrılır, ama yine de tam tutalım
     if (kalemler.every(s => s.gonderilen >= s.adet)) return { cls: 'b-green', label: 'Tamamlandı' };
     if (kalemler.every(s => s.gonderilen === 0))     return { cls: 'b-red',   label: 'Bekliyor'   };
     return { cls: 'b-yellow', label: 'Kısmi' };
@@ -635,11 +786,26 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div>
+      {/* Modaller */}
       {showHizliMusteri && (
         <HizliMusteriModal
           koyler={data.koyler}
           onKaydet={(m, yeniKoy) => hizliMusteriEkle(m, yeniKoy)}
           onKapat={() => setShowHizliMusteri(false)}
+        />
+      )}
+      {duzenlenecek && (
+        <SiparisDuzenleModal
+          siparis={duzenlenecek}
+          onKaydet={siparisDuzenleKaydet}
+          onKapat={() => setDuzenlenecek(null)}
+        />
+      )}
+      {silinecekId !== null && (
+        <OnayModal
+          mesaj={silinecekMesaj}
+          onOnayla={siparisSilOnayla}
+          onIptal={() => { setSilinecekId(null); setSilinecekMesaj(''); }}
         />
       )}
 
@@ -875,10 +1041,13 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
         </div>
       </div>
 
-      {/* ═══ SİPARİŞLER ═══ */}
+      {/* ═══ SİPARİŞLER (AÇIK) ═══ */}
       <div className="panel">
         <div className="panel-header">
           <div className="panel-title">Siparişler</div>
+          <span style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace' }}>
+            {toplamAcikKalem} açık kalem
+          </span>
         </div>
         <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 4 }}>
@@ -909,27 +1078,26 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                   <th>Toplam Tutar</th>
                   <th>İlerleme</th>
                   <th>Durum</th>
-                  <th style={{ width: 110 }}>Teslimat</th>
+                  <th style={{ width: 140 }}>İşlemler</th>
                 </tr>
               </thead>
               <tbody>
                 {sipGruplari.length === 0 ? (
-                  <tr><td colSpan={9} className="empty">Sipariş yok</td></tr>
-                ) : sipGruplari.flatMap(([musteriId, kalemler]) => {
+                  <tr><td colSpan={9} className="empty">Tüm siparişler tamamlandı 🎉</td></tr>
+                ) : sipGruplari.flatMap(([musteriId, tumKalemler]) => {
+                  // Bu grupta sadece açık kalemleri göster (tamamlananlar alt satırda da görünmesin)
+                  const acikKalemler = tumKalemler.filter(s => s.gonderilen < s.adet);
                   const m        = data.musteriler.find(x => x.id === musteriId);
-                  const badge    = sipDurumBadge(kalemler);
-                  const topTutar = kalemler.reduce((s, k) => s + k.toplamTutar, 0);
-                  const topAdet  = kalemler.reduce((s, k) => s + k.adet, 0);
-                  const topGond  = kalemler.reduce((s, k) => s + k.gonderilen, 0);
-                  const cokKalem = kalemler.length > 1;
+                  const badge    = sipDurumBadge(acikKalemler);
+                  const topTutar = acikKalemler.reduce((s, k) => s + k.toplamTutar, 0);
+                  const topAdet  = acikKalemler.reduce((s, k) => s + k.adet, 0);
+                  const topGond  = acikKalemler.reduce((s, k) => s + k.gonderilen, 0);
+                  const cokKalem = acikKalemler.length > 1;
                   const acik     = acikSipGruplari.has(musteriId);
-                  const isAcil   = kalemler.some(s => (s as Siparis & { oncelik?: string }).oncelik === 'acil');
-                  // Yer: kalemler aynı köydeyse tek yaz, farklıysa "N yer"
-                  const yerler   = [...new Set(kalemler.map(s => s.koy || s.adres || '').filter(Boolean))];
+                  const isAcil   = acikKalemler.some(s => (s as Siparis & { oncelik?: string }).oncelik === 'acil');
+                  const yerler   = [...new Set(acikKalemler.map(s => s.koy || s.adres || '').filter(Boolean))];
                   const yerOzet  = yerler.length === 0 ? '—' : yerler.length === 1 ? yerler[0] : `${yerler.length} yer`;
-                  // Tarih: en son sipariş tarihi
-                  const sonTarih = kalemler.reduce((en, s) => s.tarih > en ? s.tarih : en, kalemler[0].tarih);
-                  const acikVar  = kalemler.some(s => s.gonderilen < s.adet);
+                  const sonTarih = acikKalemler.reduce((en, s) => s.tarih > en ? s.tarih : en, acikKalemler[0].tarih);
 
                   const rows = [
                     <tr
@@ -949,26 +1117,45 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                         {yerOzet !== '—' ? <span title={yerler.join(', ')}>📍 {yerOzet}</span> : <span style={{ color: 'var(--text3)' }}>—</span>}
                       </td>
                       <td>
-                        <span className="badge b-yellow">{anaUrun(kalemler)}</span>
-                        {cokKalem && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>+{kalemler.length - 1} kalem</span>}
+                        <span className="badge b-yellow">{anaUrun(acikKalemler)}</span>
+                        {cokKalem && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>+{acikKalemler.length - 1} kalem</span>}
                       </td>
                       <td className="td-mono">{tl(topTutar)}</td>
                       <td className="td-mono" style={{ fontSize: 12 }}>{topGond.toLocaleString('tr-TR')} / {topAdet.toLocaleString('tr-TR')}</td>
                       <td><span className={`badge ${badge.cls}`}>{badge.label}</span></td>
                       <td>
-                        {acikVar && (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                           <button
                             className="btn btn-success btn-sm"
                             onClick={e => { e.stopPropagation(); hizliTeslimatYap(musteriId); }}
                           >
-                            🚛 Teslimat Yap
+                            🚛 Teslimat
                           </button>
-                        )}
+                          {!cokKalem && (
+                            <>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={e => { e.stopPropagation(); setDuzenlenecek(acikKalemler[0]); }}
+                                title="Düzenle"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                onClick={e => { e.stopPropagation(); siparisSilOnay(acikKalemler[0], m?.isim || '?'); }}
+                                title="Sil"
+                              >
+                                🗑️
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>,
                   ];
+
                   if (cokKalem && acik) {
-                    kalemler.forEach(s => {
+                    acikKalemler.forEach(s => {
                       const kalan  = s.adet - s.gonderilen;
                       const sBadge = kalan === 0 ? 'b-green' : s.gonderilen > 0 ? 'b-yellow' : 'b-red';
                       const sLabel = kalan === 0 ? 'Tamamlandı' : s.gonderilen > 0 ? 'Kısmi' : 'Bekliyor';
@@ -983,53 +1170,32 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                           <td><span className="badge b-yellow">{SIP_CESIT_LABEL[s.cesit] || s.cesit}</span></td>
                           <td className="td-mono">{tl(s.toplamTutar)}</td>
                           <td className="td-mono" style={{ fontSize: 12 }}>{s.gonderilen.toLocaleString('tr-TR')} / {s.adet.toLocaleString('tr-TR')}</td>
-                          <td style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <td>
                             <span className={`badge ${sBadge}`}>{sLabel}</span>
-                            <button className="btn btn-danger btn-sm" onClick={e => { e.stopPropagation(); siparisSil(s.id); }}>Sil</button>
                           </td>
-                          <td></td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={e => { e.stopPropagation(); setDuzenlenecek(s); }}
+                                title="Düzenle"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                onClick={e => { e.stopPropagation(); siparisSilOnay(s, m?.isim || '?'); }}
+                                title="Sil"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     });
                   }
-                  if (!cokKalem) {
-                    const s = kalemler[0];
-                    rows[0] = (
-                      <tr
-                        key={`g-${musteriId}`}
-                        style={{ background: isAcil ? 'rgba(220,50,50,.06)' : undefined }}
-                      >
-                        <td></td>
-                        <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{fd(sonTarih)}</td>
-                        <td className="td-bold">
-                          {m?.isim || '?'}
-                          {isAcil && <span className="badge b-red" style={{ marginLeft: 6, fontSize: 10 }}>🔴 ACİL</span>}
-                        </td>
-                        <td style={{ fontSize: 12, color: 'var(--text2)', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {yerOzet !== '—' ? <span title={yerler.join(', ')}>📍 {yerOzet}</span> : <span style={{ color: 'var(--text3)' }}>—</span>}
-                        </td>
-                        <td><span className="badge b-yellow">{anaUrun(kalemler)}</span></td>
-                        <td className="td-mono">{tl(topTutar)}</td>
-                        <td className="td-mono" style={{ fontSize: 12 }}>{topGond.toLocaleString('tr-TR')} / {topAdet.toLocaleString('tr-TR')}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <span className={`badge ${badge.cls}`}>{badge.label}</span>
-                            <button className="btn btn-danger btn-sm" onClick={e => { e.stopPropagation(); siparisSil(s.id); }}>Sil</button>
-                          </div>
-                        </td>
-                        <td>
-                          {acikVar && (
-                            <button
-                              className="btn btn-success btn-sm"
-                              onClick={e => { e.stopPropagation(); hizliTeslimatYap(musteriId); }}
-                            >
-                              🚛 Teslimat Yap
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  }
+
                   return rows;
                 })}
               </tbody>
