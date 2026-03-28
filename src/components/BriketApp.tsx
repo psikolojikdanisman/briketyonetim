@@ -47,8 +47,32 @@ export default function BriketApp() {
 
   if (!data) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }}>
-        Yükleniyor...
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 'var(--bg)',
+        flexDirection: 'column',
+        gap: '12px',
+      }}>
+        <div style={{
+          width: 36,
+          height: 36,
+          border: '3px solid var(--border)',
+          borderTopColor: 'var(--accent)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <span style={{
+          color: 'var(--text3)',
+          fontFamily: 'JetBrains Mono, monospace',
+          fontSize: 12,
+          letterSpacing: 1,
+        }}>
+          YÜKLENİYOR
+        </span>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -61,7 +85,7 @@ export default function BriketApp() {
 
       <div className="main">
         <div className="topbar">
-          <div className="topbar-title">{PAGE_TITLES[page] || page.toUpperCase()}</div>
+          <div className="topbar-title">{PAGE_TITLES[page] || page}</div>
           <div className="date-badge">{dateStr}</div>
         </div>
 

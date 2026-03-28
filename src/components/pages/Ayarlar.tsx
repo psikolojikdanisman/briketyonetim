@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
-import type { AppData } from '@/types';
+import { useState } from 'react';
+import type { AppData, Ayarlar, Yonetici } from '@/types';
 
 interface AyarlarProps {
   data: AppData;
@@ -8,125 +8,295 @@ interface AyarlarProps {
   showToast: (msg: string, ok?: boolean) => void;
 }
 
-export default function AyarlarPage({ data, onSave, showToast }: AyarlarProps) {
-  const a = data.ayarlar;
-  const [u10, setU10] = useState(String(a.ucret10 || ''));
-  const [u15, setU15] = useState(String(a.ucret15 || ''));
-  const [u20, setU20] = useState(String(a.ucret20 || ''));
-  const [uYuk, setUYuk] = useState(String(a.ucretYukleme || ''));
-  const [uBos, setUBos] = useState(String(a.ucretBosaltma || ''));
-  const [uDama, setUDama] = useState(String(a.ucretDama || ''));
-  const [uCim, setUCim] = useState(String(a.ucretCimento || ''));
-  const [uCimInd, setUCimInd] = useState(String(a.ucretCimentoIndirme || ''));
-  const [micirFiyat, setMicirFiyat] = useState(String(a.micirFiyat || ''));
-  const [cimentoFiyat, setCimentoFiyat] = useState(String(a.cimentoFiyat || ''));
-  const fp = a.fp || { '10luk': { merkez: 0, yakin: 0 }, '15lik': { merkez: 0, yakin: 0 }, '20lik': { merkez: 0, yakin: 0 } };
-  const [fp10m, setFp10m] = useState(String(fp['10luk']?.merkez || ''));
-  const [fp10y, setFp10y] = useState(String(fp['10luk']?.yakin || ''));
-  const [fp15m, setFp15m] = useState(String(fp['15lik']?.merkez || ''));
-  const [fp15y, setFp15y] = useState(String(fp['15lik']?.yakin || ''));
-  const [fp20m, setFp20m] = useState(String(fp['20lik']?.merkez || ''));
-  const [fp20y, setFp20y] = useState(String(fp['20lik']?.yakin || ''));
+type Sekme = 'yonetici' | 'ucretler' | 'fiyatlar';
 
-  function kaydet() {
-    const g = (v: string) => parseFloat(v) || 0;
-    const newData = {
-      ...data,
-      ayarlar: {
-        ucret10: g(u10), ucret15: g(u15), ucret20: g(u20),
-        ucretYukleme: g(uYuk), ucretBosaltma: g(uBos), ucretDama: g(uDama),
-        ucretCimento: g(uCim), ucretCimentoIndirme: g(uCimInd),
-        micirFiyat: g(micirFiyat), cimentoFiyat: g(cimentoFiyat),
-        fp: {
-          '10luk': { merkez: g(fp10m), yakin: g(fp10y) },
-          '15lik': { merkez: g(fp15m), yakin: g(fp15y) },
-          '20lik': { merkez: g(fp20m), yakin: g(fp20y) },
-        },
-      },
-    };
-    onSave(newData);
-    showToast('Ayarlar kaydedildi ✓');
+export default function AyarlarPage({ data, onSave, showToast }: AyarlarProps) {
+  const [sekme, setSekme] = useState<Sekme>('yonetici');
+
+  // ─── Yönetici formu ───────────────────────────────────────────────────────
+  const [yon, setYon] = useState<Yonetici>({ ...data.yonetici });
+
+  function yoneticiKaydet() {
+    if (!yon.ad.trim() || !yon.soyad.trim()) {
+      showToast('Ad ve soyad zorunludur', false);
+      return;
+    }
+    onSave({ ...data, yonetici: { ...yon } });
+    showToast('Yönetici bilgileri kaydedildi ✓');
   }
 
-  const inp = (label: string, value: string, onChange: (v: string) => void, placeholder?: string) => (
-    <div>
-      <label>{label}</label>
-      <input type="number" step="0.001" placeholder={placeholder || 'ör: 0.00'} value={value}
-        onChange={e => onChange(e.target.value)} />
-    </div>
-  );
+  // ─── Ücret tarifeleri formu ───────────────────────────────────────────────
+  const ay = data.ayarlar;
+  const [ucret10, setUcret10] = useState(String(ay.ucret10));
+  const [ucret15, setUcret15] = useState(String(ay.ucret15));
+  const [ucret20, setUcret20] = useState(String(ay.ucret20));
+  const [ucretYukleme, setUcretYukleme] = useState(String(ay.ucretYukleme));
+  const [ucretBosaltma, setUcretBosaltma] = useState(String(ay.ucretBosaltma));
+  const [ucretDama, setUcretDama] = useState(String(ay.ucretDama));
+  const [ucretCimento, setUcretCimento] = useState(String(ay.ucretCimento));
+  const [ucretCimentoIndirme, setUcretCimentoIndirme] = useState(String(ay.ucretCimentoIndirme));
+  const [micirFiyat, setMicirFiyat] = useState(String(ay.micirFiyat));
+  const [cimentoFiyat, setCimentoFiyat] = useState(String(ay.cimentoFiyat));
+
+  function ucretKaydet() {
+    const yeniAyarlar: Ayarlar = {
+      ...ay,
+      ucret10: parseFloat(ucret10) || 0,
+      ucret15: parseFloat(ucret15) || 0,
+      ucret20: parseFloat(ucret20) || 0,
+      ucretYukleme: parseFloat(ucretYukleme) || 0,
+      ucretBosaltma: parseFloat(ucretBosaltma) || 0,
+      ucretDama: parseFloat(ucretDama) || 0,
+      ucretCimento: parseFloat(ucretCimento) || 0,
+      ucretCimentoIndirme: parseFloat(ucretCimentoIndirme) || 0,
+      micirFiyat: parseFloat(micirFiyat) || 0,
+      cimentoFiyat: parseFloat(cimentoFiyat) || 0,
+    };
+    onSave({ ...data, ayarlar: yeniAyarlar });
+    showToast('Ücret tarifeleri kaydedildi ✓');
+  }
+
+  // ─── Satış fiyatları formu ────────────────────────────────────────────────
+  const fp = ay.fp;
+  const [fp10m, setFp10m] = useState(String(fp['10luk'].merkez));
+  const [fp10y, setFp10y] = useState(String(fp['10luk'].yakin));
+  const [fp15m, setFp15m] = useState(String(fp['15lik'].merkez));
+  const [fp15y, setFp15y] = useState(String(fp['15lik'].yakin));
+  const [fp20m, setFp20m] = useState(String(fp['20lik'].merkez));
+  const [fp20y, setFp20y] = useState(String(fp['20lik'].yakin));
+
+  function fiyatKaydet() {
+    const yeniFp = {
+      '10luk': { merkez: parseFloat(fp10m) || 0, yakin: parseFloat(fp10y) || 0 },
+      '15lik': { merkez: parseFloat(fp15m) || 0, yakin: parseFloat(fp15y) || 0 },
+      '20lik': { merkez: parseFloat(fp20m) || 0, yakin: parseFloat(fp20y) || 0 },
+    };
+    onSave({ ...data, ayarlar: { ...ay, fp: yeniFp } });
+    showToast('Satış fiyatları kaydedildi ✓');
+  }
+
+  // ─── Sekme butonları ──────────────────────────────────────────────────────
+  const sekmeler: { key: Sekme; label: string; icon: string }[] = [
+    { key: 'yonetici', label: 'Yönetici Bilgileri', icon: '👤' },
+    { key: 'ucretler', label: 'İşçi Ücret Tarifeleri', icon: '👷' },
+    { key: 'fiyatlar', label: 'Satış Fiyatları', icon: '💰' },
+  ];
 
   return (
     <div>
-      <div className="warn-box">
-        ⚠ Bu sayfadaki değerler tüm ücret hesaplamalarında kullanılır. Değiştirdiğinizde eski kayıtlar etkilenmez — yeni girişler için geçerli olur.
+      {/* Sekme çubuğu */}
+      <div style={{
+        display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap',
+      }}>
+        {sekmeler.map(s => (
+          <button
+            key={s.key}
+            className={`btn ${sekme === s.key ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setSekme(s.key)}
+            style={{ gap: 6 }}
+          >
+            <span>{s.icon}</span> {s.label}
+          </button>
+        ))}
       </div>
 
-      <div className="two-col">
-        <div className="panel">
-          <div className="panel-header"><div className="panel-title">Üretim — İşçi Birim Ücretleri</div></div>
+      {/* ── YÖNETİCİ BİLGİLERİ ── */}
+      {sekme === 'yonetici' && (
+        <div className="panel" style={{ maxWidth: 520 }}>
+          <div className="panel-header">
+            <div className="panel-title">👤 Yönetici Bilgileri</div>
+          </div>
           <div className="panel-body">
-            <div className="frow c3">
-              {inp("10'LUK (TL/adet)", u10, setU10, 'ör: 0.12')}
-              {inp("15'LİK (TL/adet)", u15, setU15, 'ör: 0.15')}
-              {inp("20'LİK (TL/adet)", u20, setU20, 'ör: 0.18')}
+            <div className="warn-box" style={{ marginBottom: 16 }}>
+              Bu bilgiler makbuzlarda otomatik olarak kullanılır.
             </div>
-            <div className="field-hint">Örnek: 3000 adet × 0.12 TL = 360 TL toplam → 3 işçiye = 120 TL / kişi</div>
+
+            <div className="frow c2">
+              <div>
+                <label>Ad</label>
+                <input
+                  type="text"
+                  placeholder="Örn: Ahmet"
+                  value={yon.ad}
+                  onChange={e => setYon(y => ({ ...y, ad: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label>Soyad</label>
+                <input
+                  type="text"
+                  placeholder="Örn: Yılmaz"
+                  value={yon.soyad}
+                  onChange={e => setYon(y => ({ ...y, soyad: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="frow">
+              <div>
+                <label>Telefon</label>
+                <input
+                  type="tel"
+                  placeholder="Örn: 0532 123 45 67"
+                  value={yon.tel}
+                  onChange={e => setYon(y => ({ ...y, tel: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Önizleme */}
+            {(yon.ad || yon.soyad || yon.tel) && (
+              <div style={{
+                background: 'var(--surface2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                padding: '12px 16px',
+                marginBottom: 16,
+                fontSize: 13,
+              }}>
+                <div style={{ fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginBottom: 6, fontFamily: 'JetBrains Mono, monospace' }}>
+                  MAKBUZLARDA GÖRÜNECEK
+                </div>
+                <div style={{ fontWeight: 600, color: 'var(--text)' }}>
+                  İdooğlu Briket
+                </div>
+                {(yon.ad || yon.soyad) && (
+                  <div style={{ color: 'var(--text2)', fontSize: 12, marginTop: 2 }}>
+                    {[yon.ad, yon.soyad].filter(Boolean).join(' ')}
+                  </div>
+                )}
+                {yon.tel && (
+                  <div style={{ color: 'var(--text2)', fontSize: 12, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>
+                    {yon.tel}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button className="btn btn-primary" onClick={yoneticiKaydet}>
+              ✓ Kaydet
+            </button>
           </div>
         </div>
+      )}
 
-        <div className="panel">
-          <div className="panel-header"><div className="panel-title">Yükleme / Boşaltma Birim Ücretleri</div></div>
+      {/* ── İŞÇİ ÜCRET TARİFELERİ ── */}
+      {sekme === 'ucretler' && (
+        <div>
+          <div className="panel" style={{ maxWidth: 560 }}>
+            <div className="panel-header">
+              <div className="panel-title">Üretim Ücretleri (adet başı ₺)</div>
+            </div>
+            <div className="panel-body">
+              <div className="frow c3">
+                <div>
+                  <label>10&apos;luk Briket</label>
+                  <input type="number" step="0.01" value={ucret10} onChange={e => setUcret10(e.target.value)} />
+                </div>
+                <div>
+                  <label>15&apos;lik Briket</label>
+                  <input type="number" step="0.01" value={ucret15} onChange={e => setUcret15(e.target.value)} />
+                </div>
+                <div>
+                  <label>20&apos;lik Briket</label>
+                  <input type="number" step="0.01" value={ucret20} onChange={e => setUcret20(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="panel" style={{ maxWidth: 560 }}>
+            <div className="panel-header">
+              <div className="panel-title">Yükleme / Boşaltma Ücretleri (adet başı ₺)</div>
+            </div>
+            <div className="panel-body">
+              <div className="frow c2">
+                <div>
+                  <label>Yükleme</label>
+                  <input type="number" step="0.01" value={ucretYukleme} onChange={e => setUcretYukleme(e.target.value)} />
+                </div>
+                <div>
+                  <label>Boşaltma</label>
+                  <input type="number" step="0.01" value={ucretBosaltma} onChange={e => setUcretBosaltma(e.target.value)} />
+                </div>
+                <div>
+                  <label>Dama Boşaltma</label>
+                  <input type="number" step="0.01" value={ucretDama} onChange={e => setUcretDama(e.target.value)} />
+                </div>
+                <div>
+                  <label>Çimento Yükleme</label>
+                  <input type="number" step="0.01" value={ucretCimento} onChange={e => setUcretCimento(e.target.value)} />
+                </div>
+                <div>
+                  <label>Çimento İndirme</label>
+                  <input type="number" step="0.01" value={ucretCimentoIndirme} onChange={e => setUcretCimentoIndirme(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="panel" style={{ maxWidth: 560 }}>
+            <div className="panel-header">
+              <div className="panel-title">Malzeme Alış Fiyatları (ton başı ₺)</div>
+            </div>
+            <div className="panel-body">
+              <div className="frow c2">
+                <div>
+                  <label>Mıcır Fiyatı</label>
+                  <input type="number" step="0.01" value={micirFiyat} onChange={e => setMicirFiyat(e.target.value)} />
+                </div>
+                <div>
+                  <label>Çimento Fiyatı (torba)</label>
+                  <input type="number" step="0.01" value={cimentoFiyat} onChange={e => setCimentoFiyat(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button className="btn btn-primary" onClick={ucretKaydet}>✓ Ücretleri Kaydet</button>
+        </div>
+      )}
+
+      {/* ── SATIŞ FİYATLARI ── */}
+      {sekme === 'fiyatlar' && (
+        <div className="panel" style={{ maxWidth: 560 }}>
+          <div className="panel-header">
+            <div className="panel-title">Satış Fiyat Tarifeleri (adet başı ₺)</div>
+          </div>
           <div className="panel-body">
-            <div className="frow c2">
-              {inp('BRİKET YÜKLEME (TL/adet)', uYuk, setUYuk, 'ör: 0.05')}
-              {inp('BRİKET BOŞALTMA (TL/adet)', uBos, setUBos, 'ör: 0.05')}
+            <div className="warn-box">
+              Merkez: yakın mesafe köyler · Yakın: orta mesafe köyler
             </div>
-            <div className="frow c2">
-              {inp('DAMA BOŞALTMA (TL/adet)', uDama, setUDama, 'ör: 0.07')}
-            </div>
-            <div className="frow c2">
-              {inp('ÇİMENTO YÜKLEME (TL/torba)', uCim, setUCim, 'ör: 0.30')}
-              {inp('ÇİMENTO İNDİRME (TL/torba)', uCimInd, setUCimInd, 'ör: 0.30')}
-            </div>
+
+            {(['10luk', '15lik', '20lik'] as const).map(cesit => {
+              const labels: Record<string, string> = { '10luk': "10'luk", '15lik': "15'lik", '20lik': "20'lik" };
+              const vals = {
+                '10luk': { m: fp10m, setM: setFp10m, y: fp10y, setY: setFp10y },
+                '15lik': { m: fp15m, setM: setFp15m, y: fp15y, setY: setFp15y },
+                '20lik': { m: fp20m, setM: setFp20m, y: fp20y, setY: setFp20y },
+              }[cesit];
+              return (
+                <div key={cesit} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 8, fontFamily: 'JetBrains Mono, monospace' }}>
+                    Briket {labels[cesit]}
+                  </div>
+                  <div className="frow c2" style={{ marginBottom: 0 }}>
+                    <div>
+                      <label>Merkez</label>
+                      <input type="number" step="0.01" value={vals.m} onChange={e => vals.setM(e.target.value)} />
+                    </div>
+                    <div>
+                      <label>Yakın</label>
+                      <input type="number" step="0.01" value={vals.y} onChange={e => vals.setY(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <button className="btn btn-primary" onClick={fiyatKaydet}>✓ Fiyatları Kaydet</button>
           </div>
         </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-header"><div className="panel-title">Briket Satış Fiyatları (Bölgeye Göre)</div></div>
-        <div className="panel-body">
-          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr', gap: 12, alignItems: 'center', marginBottom: 10 }}>
-            <div></div>
-            <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: 'var(--blue)', textAlign: 'center' }}>📍 MERKEZ</div>
-            <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: 'var(--accent)', textAlign: 'center' }}>🌿 YAKIN KÖY</div>
-          </div>
-          {[
-            ["10'luk", fp10m, setFp10m, fp10y, setFp10y],
-            ["15'lik", fp15m, setFp15m, fp15y, setFp15y],
-            ["20'lik", fp20m, setFp20m, fp20y, setFp20y],
-          ].map(([label, vm, setM, vy, setY]) => (
-            <div key={label as string} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr', gap: 12, alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ fontSize: 13, color: 'var(--text)' }}>{label as string}</div>
-              <input type="number" step="0.01" placeholder="TL/adet" value={vm as string} onChange={e => (setM as (v: string) => void)(e.target.value)} />
-              <input type="number" step="0.01" placeholder="TL/adet" value={vy as string} onChange={e => (setY as (v: string) => void)(e.target.value)} />
-            </div>
-          ))}
-          <div className="field-hint" style={{ marginTop: 10 }}>Uzak köy fiyatı sipariş sırasında manuel girilir — mesafeye göre değişir</div>
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-header"><div className="panel-title">Malzeme Alış Fiyatları</div></div>
-        <div className="panel-body">
-          <div className="frow c3">
-            {inp('MICI​R BİRİM FİYATI (TL/ton)', micirFiyat, setMicirFiyat, 'ör: 450.00')}
-            {inp('ÇİMENTO BİRİM FİYATI (TL/torba)', cimentoFiyat, setCimentoFiyat, 'ör: 35.00')}
-          </div>
-        </div>
-      </div>
-
-      <button className="btn btn-primary" onClick={kaydet}>✦ Ayarları Kaydet</button>
+      )}
     </div>
   );
 }

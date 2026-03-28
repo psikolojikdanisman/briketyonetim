@@ -1,4 +1,4 @@
-import type { AppData, Ayarlar } from '@/types';
+import type { AppData, Ayarlar, Yonetici } from '@/types';
 
 const STORAGE_KEY = 'byk_v3';
 
@@ -20,7 +20,14 @@ const defaultAyarlar: Ayarlar = {
   },
 };
 
+export const defaultYonetici: Yonetici = {
+  ad: '',
+  soyad: '',
+  tel: '',
+};
+
 export const defaultData: AppData = {
+  yonetici: defaultYonetici,
   ayarlar: defaultAyarlar,
   isciler: [],
   uretimler: [],
@@ -47,6 +54,8 @@ export function loadData(): AppData {
     if (!raw) return { ...defaultData };
     const parsed = JSON.parse(raw);
     const merged: AppData = { ...defaultData, ...parsed };
+    // Migration: eski kayıtlarda yonetici yoksa ekle
+    if (!merged.yonetici) merged.yonetici = { ...defaultYonetici };
     if (!merged.ayarlar.fp) merged.ayarlar.fp = defaultAyarlar.fp;
     if (!merged.tedarikOdemeler) merged.tedarikOdemeler = [];
     if (!merged.tedarikciListesi) merged.tedarikciListesi = [];
@@ -170,5 +179,5 @@ export const PAGE_TITLES: Record<string, string> = {
   malzeme: 'MALZEME GİRİŞİ',
   giderler: 'GİDERLER',
   koyler: 'KÖY / BÖLGE YÖNETİMİ',
-  ayarlar: 'ÜCRET TARİFELERİ',
+  ayarlar: 'AYARLAR',
 };

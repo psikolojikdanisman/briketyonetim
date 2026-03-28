@@ -1,5 +1,11 @@
 // ═══ CORE TYPES ═══
 
+export interface Yonetici {
+  ad: string;
+  soyad: string;
+  tel: string;
+}
+
 export interface Isci {
   id: number;
   isim: string;
@@ -190,6 +196,7 @@ export interface Ayarlar {
 }
 
 export interface AppData {
+  yonetici: Yonetici;
   ayarlar: Ayarlar;
   isciler: Isci[];
   uretimler: Uretim[];
