@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import UretimPage from './pages/Uretim';
 import YuklemePage from './pages/Yukleme';
 import IscilerPage from './pages/Isciler';
+import IsciDetay from './pages/IsciDetay';
 import SiparislerPage from './pages/Siparisler';
 import SpotSatisPage from './pages/SpotSatis';
 import MusterilerPage from './pages/Musteriler';
@@ -19,6 +20,7 @@ import AyarlarPage from './pages/Ayarlar';
 export default function BriketApp() {
   const [data, setData] = useState<AppData | null>(null);
   const [page, setPage] = useState<PageKey>('dashboard');
+  const [aktifIsciId, setAktifIsciId] = useState<number | null>(null);
   const [toast, setToast] = useState<ToastState>({ message: '', ok: true, visible: false });
   const [dateStr, setDateStr] = useState('');
 
@@ -43,6 +45,26 @@ export default function BriketApp() {
   const showToast = useCallback((msg: string, ok = true) => {
     setToast({ message: msg, ok, visible: true });
     setTimeout(() => setToast((t) => ({ ...t, visible: false })), 2800);
+  }, []);
+
+  // İşçi detay sayfasına git
+  const isciDetayGit = useCallback((isciId: number) => {
+    setAktifIsciId(isciId);
+    setPage('isci-detay');
+  }, []);
+
+  // İşçi detaydan geri dön
+  const isciDetayGeri = useCallback(() => {
+    setAktifIsciId(null);
+    setPage('isciler');
+  }, []);
+
+  // Sidebar'dan sayfa değişince isci-detay state'ini temizle
+  const handleNavigate = useCallback((newPage: PageKey) => {
+    if (newPage !== 'isci-detay') {
+      setAktifIsciId(null);
+    }
+    setPage(newPage);
   }, []);
 
   if (!data) {
@@ -79,28 +101,40 @@ export default function BriketApp() {
 
   const pageProps = { data, onSave: handleSave, showToast };
 
+  // Topbar başlığı: isci-detay sayfasında işçi adını göster
+  const topbarTitle = page === 'isci-detay' && aktifIsciId
+    ? (data.isciler.find(i => i.id === aktifIsciId)?.isim?.toUpperCase() || 'İŞÇİ PROFİLİ')
+    : (PAGE_TITLES[page] || page);
+
   return (
     <div className="layout">
-      <Sidebar activePage={page} onNavigate={setPage} />
+      <Sidebar activePage={page} onNavigate={handleNavigate} />
 
       <div className="main">
         <div className="topbar">
-          <div className="topbar-title">{PAGE_TITLES[page] || page}</div>
+          <div className="topbar-title">{topbarTitle}</div>
           <div className="date-badge">{dateStr}</div>
         </div>
 
         <div className="content">
-          {page === 'dashboard'  && <Dashboard data={data} />}
-          {page === 'uretim'     && <UretimPage {...pageProps} />}
-          {page === 'yukleme'    && <YuklemePage {...pageProps} />}
-          {page === 'isciler'    && <IscilerPage {...pageProps} />}
-          {page === 'siparisler' && <SiparislerPage {...pageProps} />}
-          {page === 'spotsatis'  && <SpotSatisPage {...pageProps} />}
-          {page === 'musteriler' && <MusterilerPage {...pageProps} />}
-          {page === 'malzeme'    && <MalzemePage {...pageProps} />}
-          {page === 'giderler'   && <GiderlerPage {...pageProps} />}
-          {page === 'koyler'     && <KoylerPage {...pageProps} />}
-          {page === 'ayarlar'    && <AyarlarPage {...pageProps} />}
+          {page === 'dashboard'   && <Dashboard data={data} />}
+          {page === 'uretim'      && <UretimPage {...pageProps} />}
+          {page === 'yukleme'     && <YuklemePage {...pageProps} />}
+          {page === 'isciler'     && <IscilerPage {...pageProps} onIsciDetay={isciDetayGit} />}
+          {page === 'isci-detay'  && aktifIsciId !== null && (
+            <IsciDetay
+              {...pageProps}
+              isciId={aktifIsciId}
+              onGeri={isciDetayGeri}
+            />
+          )}
+          {page === 'siparisler'  && <SiparislerPage {...pageProps} />}
+          {page === 'spotsatis'   && <SpotSatisPage {...pageProps} />}
+          {page === 'musteriler'  && <MusterilerPage {...pageProps} />}
+          {page === 'malzeme'     && <MalzemePage {...pageProps} />}
+          {page === 'giderler'    && <GiderlerPage {...pageProps} />}
+          {page === 'koyler'      && <KoylerPage {...pageProps} />}
+          {page === 'ayarlar'     && <AyarlarPage {...pageProps} />}
         </div>
       </div>
 

@@ -8,18 +8,10 @@ interface IscilerProps {
   data: AppData;
   onSave: (data: AppData) => void;
   showToast: (msg: string, ok?: boolean) => void;
+  onIsciDetay: (isciId: number) => void;
 }
 
-const TUR_LABEL: Record<string, string> = {
-  yukleme: 'Yükleme', bosaltma: 'İndirme', dama_bosaltma: 'Dama İndirme',
-  cimento: 'Çim. Yükleme', cimento_indirme: 'Çim. İndirme',
-};
-const TUR_BADGE: Record<string, string> = {
-  yukleme: 'b-blue', bosaltma: 'b-green', dama_bosaltma: 'b-yellow',
-  cimento: 'b-gray', cimento_indirme: 'b-gray',
-};
-
-export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
+export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: IscilerProps) {
   const [isim, setIsim] = useState('');
   const [avIsci, setAvIsci] = useState('');
   const [avTutar, setAvTutar] = useState('');
@@ -32,7 +24,6 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
     tumKazanc: number; tumOdenenOncesi: number;
   } | null>(null);
 
-  const [profilId, setProfilId] = useState<number | null>(null);
   const { bas, bit } = buHafta();
 
   function isciEkle() {
@@ -44,7 +35,6 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
 
   function isciSil(id: number) {
     onSave({ ...data, isciler: data.isciler.filter(i => i.id !== id) });
-    if (profilId === id) setProfilId(null);
     showToast('İşçi silindi');
   }
 
@@ -118,7 +108,6 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
     if (!sonOdeme) return;
     const kalanSonra = Math.max(0, sonOdeme.tumKazanc - sonOdeme.tumOdenenOncesi - sonOdeme.tutar);
     const haftaKalan = Math.max(0, sonOdeme.haftaKazanc - sonOdeme.haftaOdenenOncesi - sonOdeme.tutar);
-
     makbuzIndir({
       baslik: 'ISCI ODEME MAKBUZU',
       makbuzNo: sonOdeme.no,
@@ -142,104 +131,27 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
 
   function avSil(id: number) { onSave({ ...data, avanslar: data.avanslar.filter(a => a.id !== id) }); }
 
-  const profilIsci = profilId !== null ? data.isciler.find(i => i.id === profilId) : null;
-
-  function ProfilModal() {
-    if (!profilIsci) return null;
-    const iid = profilIsci.id;
-    const tumKazanc = isciTumZamanKazanc(iid);
-    const tumOdenen = isciTumOdenen(iid);
-    const tumKalan  = tumKazanc.top - tumOdenen;
-    const haftaKazanc = isciKazanc(iid);
-    const haftaOdenen = isciOdenen(iid);
-    const haftaKalan  = haftaKazanc.top - haftaOdenen;
-    const uretimler  = [...data.uretimler].filter(u => u.isciler.includes(iid)).sort((a, b) => b.tarih.localeCompare(a.tarih)).slice(0, 20);
-    const yuklemeler = [...data.yuklemeler].filter(y => y.isciler.includes(iid)).sort((a, b) => b.tarih.localeCompare(a.tarih)).slice(0, 20);
-    const odemeler   = [...data.avanslar].filter(a => a.isciId === iid).sort((a, b) => b.tarih.localeCompare(a.tarih));
-
-    return (
-      <div className="modal-overlay open" onClick={e => { if (e.target === e.currentTarget) setProfilId(null); }}>
-        <div className="modal" style={{ width: 820, maxWidth: '95vw', maxHeight: '90vh' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-            <div className="modal-title" style={{ margin: 0 }}>
-              {profilIsci.isim}
-              <span style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace', marginLeft: 12, fontWeight: 400 }}>İŞÇİ PROFİLİ</span>
-            </div>
-            <button className="btn btn-secondary btn-sm" onClick={() => setProfilId(null)}>✕ Kapat</button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
-            {[
-              { label: 'Tüm Zamanlar Kazanç', value: tl(tumKazanc.top), color: 'var(--accent)' },
-              { label: 'Toplam Ödenen',        value: tl(tumOdenen),     color: 'var(--green)'  },
-              { label: 'Toplam Kalan',         value: tl(tumKalan),      color: tumKalan > 0 ? 'var(--green)' : 'var(--text3)' },
-              { label: 'Bu Hafta Kalan',       value: tl(haftaKalan),    color: haftaKalan > 0 ? 'var(--green)' : 'var(--text3)' },
-            ].map(s => (
-              <div key={s.label} className="stat-card" style={{ padding: '12px 14px' }}>
-                <div className="stat-label">{s.label}</div>
-                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: s.color, marginTop: 4 }}>{s.value}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ background: 'rgba(46,196,182,.06)', border: '1px solid rgba(46,196,182,.2)', borderRadius: 'var(--radius)', padding: '10px 16px', marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace' }}>
-            <div><div style={{ color: 'var(--text3)', marginBottom: 2 }}>BU HAFTA</div><div style={{ color: 'var(--text2)' }}>{fd(bas)} — {fd(bit)}</div></div>
-            <div><div style={{ color: 'var(--text3)', marginBottom: 2 }}>ÜRETİMDEN</div><div style={{ color: 'var(--accent)' }}>{tl(haftaKazanc.ure)}</div></div>
-            <div><div style={{ color: 'var(--text3)', marginBottom: 2 }}>YÜKLEMEDEN</div><div style={{ color: 'var(--accent)' }}>{tl(haftaKazanc.yuk)}</div></div>
-            <div><div style={{ color: 'var(--text3)', marginBottom: 2 }}>ÖDENEN</div><div style={{ color: 'var(--green)' }}>{tl(haftaOdenen)}</div></div>
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 14, letterSpacing: 1, marginBottom: 8 }}>ÜRETİM GEÇMİŞİ</div>
-            <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-              <table>
-                <thead><tr><th>Tarih</th><th>Çeşit</th><th>Toplam Üretim</th><th>Kişi Başı Ücret</th><th>Toplam Havuz</th></tr></thead>
-                <tbody>
-                  {uretimler.length === 0 ? <tr><td colSpan={5} className="empty">Üretim kaydı yok</td></tr> : uretimler.map(u => (
-                    <tr key={u.id}><td>{fd(u.tarih)}</td><td><span className="badge b-yellow">{u.cesit}</span></td><td className="td-mono">{u.miktar.toLocaleString('tr-TR')} adet</td><td className="td-mono positive">{tl(u.kisiBasiUcret)}</td><td className="td-mono">{tl(u.toplamUcret)}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 14, letterSpacing: 1, marginBottom: 8 }}>YÜKLEME / İNDİRME GEÇMİŞİ</div>
-            <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-              <table>
-                <thead><tr><th>Tarih</th><th>İşlem</th><th>Miktar</th><th>Kişi Başı Ücret</th><th>Not</th></tr></thead>
-                <tbody>
-                  {yuklemeler.length === 0 ? <tr><td colSpan={5} className="empty">Kayıt yok</td></tr> : yuklemeler.map(y => (
-                    <tr key={y.id}><td>{fd(y.tarih)}</td><td><span className={`badge ${TUR_BADGE[y.tur] || 'b-gray'}`}>{TUR_LABEL[y.tur] || y.tur}</span></td><td className="td-mono">{y.miktar.toLocaleString('tr-TR')}</td><td className="td-mono positive">{tl(y.kisiBasiUcret)}</td><td style={{ fontSize: 11, color: 'var(--text3)' }}>{y.not || '—'}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 14, letterSpacing: 1, marginBottom: 8 }}>ÖDEME HAREKETLERİ</div>
-            <div style={{ maxHeight: 180, overflowY: 'auto' }}>
-              <table>
-                <thead><tr><th>Tarih</th><th>Tutar</th><th>Açıklama</th><th></th></tr></thead>
-                <tbody>
-                  {odemeler.length === 0 ? <tr><td colSpan={4} className="empty">Ödeme kaydı yok</td></tr> : odemeler.map(o => (
-                    <tr key={o.id}><td>{fd(o.tarih)}</td><td className="td-mono positive">{tl(o.tutar)}</td><td>{o.aciklama || '—'}</td><td><button className="btn btn-danger btn-sm" onClick={() => avSil(o.id)}>Sil</button></td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const isimStyle: React.CSSProperties = { cursor: 'pointer', color: 'var(--accent)', fontWeight: 600, textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 };
+  const isimStyle: React.CSSProperties = {
+    cursor: 'pointer',
+    color: 'var(--accent)',
+    fontWeight: 600,
+    textDecoration: 'underline',
+    textDecorationStyle: 'dotted',
+    textUnderlineOffset: 3,
+  };
 
   return (
     <div>
-      <ProfilModal />
       <div className="two-col">
         <div className="panel">
           <div className="panel-header"><div className="panel-title">İşçi Ekle</div></div>
           <div className="panel-body">
-            <div className="frow"><div><label>Ad Soyad</label><input type="text" placeholder="İşçi adı" value={isim} onChange={e => setIsim(e.target.value)} onKeyDown={e => e.key === 'Enter' && isciEkle()} /></div></div>
+            <div className="frow">
+              <div>
+                <label>Ad Soyad</label>
+                <input type="text" placeholder="İşçi adı" value={isim} onChange={e => setIsim(e.target.value)} onKeyDown={e => e.key === 'Enter' && isciEkle()} />
+              </div>
+            </div>
             <button className="btn btn-primary" onClick={isciEkle}>+ Ekle</button>
           </div>
         </div>
@@ -305,7 +217,7 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
               const odened = isciOdenen(i.id);
               const kalan  = k.top - odened;
               return (
-                <div key={i.id} className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setProfilId(i.id)}>
+                <div key={i.id} className="stat-card" style={{ cursor: 'pointer' }} onClick={() => onIsciDetay(i.id)}>
                   <div className="stat-label" style={{ color: 'var(--accent)' }}>{i.isim}</div>
                   <div style={{ fontSize: 18, fontFamily: "'Bebas Neue', sans-serif", color: 'var(--text)' }}>{tl(k.top)}</div>
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Üretim: {tl(k.ure)} | Yükleme: {tl(k.yuk)}</div>
@@ -336,7 +248,7 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
                 const kalan  = k.top - odened;
                 return (
                   <tr key={i.id}>
-                    <td><span style={isimStyle} onClick={() => setProfilId(i.id)}>{i.isim}</span></td>
+                    <td><span style={isimStyle} onClick={() => onIsciDetay(i.id)}>{i.isim}</span></td>
                     <td className="td-mono">{tl(k.top)}</td>
                     <td className="td-mono positive">{tl(odened)}</td>
                     <td className={`td-mono ${kalan > 0 ? 'positive' : ''}`}>{tl(kalan)}</td>
@@ -363,7 +275,7 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
                 return (
                   <tr key={a.id}>
                     <td>{fd(a.tarih)}</td>
-                    <td><span style={isimStyle} onClick={() => i && setProfilId(i.id)}>{i?.isim || '?'}</span></td>
+                    <td><span style={isimStyle} onClick={() => i && onIsciDetay(i.id)}>{i?.isim || '?'}</span></td>
                     <td className="td-mono positive">{tl(a.tutar)}</td>
                     <td>{a.aciklama || '—'}</td>
                     <td><button className="btn btn-danger btn-sm" onClick={() => avSil(a.id)}>Sil</button></td>

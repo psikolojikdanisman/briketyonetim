@@ -54,7 +54,6 @@ export function loadData(): AppData {
     if (!raw) return { ...defaultData };
     const parsed = JSON.parse(raw);
     const merged: AppData = { ...defaultData, ...parsed };
-    // Migration: eski kayıtlarda yonetici yoksa ekle
     if (!merged.yonetici) merged.yonetici = { ...defaultYonetici };
     if (!merged.ayarlar.fp) merged.ayarlar.fp = defaultAyarlar.fp;
     if (!merged.tedarikOdemeler) merged.tedarikOdemeler = [];
@@ -173,6 +172,7 @@ export const PAGE_TITLES: Record<string, string> = {
   uretim: 'GÜNLÜK ÜRETİM',
   yukleme: 'YÜKLEME / BOŞALTMA',
   isciler: 'İŞÇİ YÖNETİMİ',
+  'isci-detay': 'İŞÇİ PROFİLİ',
   siparisler: 'SİPARİŞLER',
   spotsatis: 'SPOT SATIŞ',
   musteriler: 'MÜŞTERİLER & BORÇ',

@@ -50,6 +50,9 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
+  // isci-detay sayfasındayken isciler nav-item'ı aktif göster
+  const effectivePage = activePage === 'isci-detay' ? 'isciler' : activePage;
+
   return (
     <aside className="sidebar">
       {/* Başlık */}
@@ -68,7 +71,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
             {group.items?.map((item) => (
               <div
                 key={item.key}
-                className={`nav-item${activePage === item.key ? ' active' : ''}`}
+                className={`nav-item${effectivePage === item.key ? ' active' : ''}`}
                 onClick={() => onNavigate(item.key)}
               >
                 <span className="icon">{item.icon}</span>

@@ -221,6 +221,7 @@ export type PageKey =
   | 'uretim'
   | 'yukleme'
   | 'isciler'
+  | 'isci-detay'
   | 'siparisler'
   | 'spotsatis'
   | 'musteriler'
