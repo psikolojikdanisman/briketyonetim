@@ -1,0 +1,87 @@
+'use client';
+import { useState, useEffect, useCallback } from 'react';
+import type { AppData, PageKey } from '@/types';
+import { loadData, saveData, PAGE_TITLES } from '@/lib/storage';
+import Sidebar from './Sidebar';
+import Toast, { type ToastState } from './Toast';
+import Dashboard from './pages/Dashboard';
+import UretimPage from './pages/Uretim';
+import YuklemePage from './pages/Yukleme';
+import IscilerPage from './pages/Isciler';
+import HaftalikPage from './pages/Haftalik';
+import SiparislerPage from './pages/Siparisler';
+import SpotSatisPage from './pages/SpotSatis';
+import MusterilerPage from './pages/Musteriler';
+import MalzemePage from './pages/Malzeme';
+import KoylerPage from './pages/Koyler';
+import AyarlarPage from './pages/Ayarlar';
+
+export default function BriketApp() {
+  const [data, setData] = useState<AppData | null>(null);
+  const [page, setPage] = useState<PageKey>('dashboard');
+  const [toast, setToast] = useState<ToastState>({ message: '', ok: true, visible: false });
+  const [dateStr, setDateStr] = useState('');
+
+  // Yalnızca client tarafında yükle
+  useEffect(() => {
+    setData(loadData());
+    const now = new Date();
+    setDateStr(
+      now.toLocaleDateString('tr-TR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    );
+  }, []);
+
+  const handleSave = useCallback((newData: AppData) => {
+    setData(newData);
+    saveData(newData);
+  }, []);
+
+  const showToast = useCallback((msg: string, ok = true) => {
+    setToast({ message: msg, ok, visible: true });
+    setTimeout(() => setToast((t) => ({ ...t, visible: false })), 2800);
+  }, []);
+
+  if (!data) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }}>
+        Yükleniyor...
+      </div>
+    );
+  }
+
+  const pageProps = { data, onSave: handleSave, showToast };
+
+  return (
+    <div className="layout">
+      <Sidebar activePage={page} onNavigate={setPage} />
+
+      <div className="main">
+        <div className="topbar">
+          <div className="topbar-title">{PAGE_TITLES[page] || page.toUpperCase()}</div>
+          <div className="date-badge">{dateStr}</div>
+        </div>
+
+        <div className="content">
+          {page === 'dashboard' && <Dashboard data={data} />}
+          {page === 'uretim' && <UretimPage {...pageProps} />}
+          {page === 'yukleme' && <YuklemePage {...pageProps} />}
+          {page === 'isciler' && <IscilerPage {...pageProps} />}
+          {page === 'haftalik' && <HaftalikPage {...pageProps} />}
+          {page === 'siparisler' && <SiparislerPage {...pageProps} />}
+          {page === 'spotsatis' && <SpotSatisPage {...pageProps} />}
+          {page === 'musteriler' && <MusterilerPage {...pageProps} />}
+          {page === 'malzeme' && <MalzemePage {...pageProps} />}
+          {page === 'koyler' && <KoylerPage {...pageProps} />}
+          {page === 'ayarlar' && <AyarlarPage {...pageProps} />}
+        </div>
+      </div>
+
+      <Toast state={toast} />
+    </div>
+  );
+}
