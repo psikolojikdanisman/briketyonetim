@@ -94,6 +94,24 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
     return data.avanslar.filter(a => a.isciId === isciId).reduce((s, a) => s + a.tutar, 0);
   }
 
+  // İşçinin tüm zamanlardaki kalan borcu
+  function isciKalan(isciId: number) {
+    return isciTumZamanKazanc(isciId).top - isciTumOdenen(isciId);
+  }
+
+  // ─── İşçi seçilince tutar otomatik dolar ─────────────────────────────────
+
+  function handleIsciSec(val: string) {
+    setAvIsci(val);
+    if (val) {
+      const id = parseInt(val);
+      const kalan = isciKalan(id);
+      setAvTutar(kalan > 0 ? String(kalan) : '');
+    } else {
+      setAvTutar('');
+    }
+  }
+
   // ─── Profil içeriği ───────────────────────────────────────────────────────
 
   const profilIsci = profilId !== null ? data.isciler.find(i => i.id === profilId) : null;
@@ -321,7 +339,7 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
             <div className="frow c2">
               <div>
                 <label>İşçi</label>
-                <select value={avIsci} onChange={e => setAvIsci(e.target.value)}>
+                <select value={avIsci} onChange={e => handleIsciSec(e.target.value)}>
                   <option value="">— Seç —</option>
                   {data.isciler.map(i => <option key={i.id} value={i.id}>{i.isim}</option>)}
                 </select>
@@ -408,8 +426,8 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
               ) : (
                 data.isciler.map(i => {
                   const k = isciKazanc(i.id);
-                  const odenen = isciOdenen(i.id);
-                  const kalan = k.top - odenen;
+                  const odened = isciOdenen(i.id);
+                  const kalan = k.top - odened;
                   return (
                     <tr key={i.id}>
                       <td>
@@ -418,7 +436,7 @@ export default function IscilerPage({ data, onSave, showToast }: IscilerProps) {
                         </span>
                       </td>
                       <td className="td-mono">{tl(k.top)}</td>
-                      <td className="td-mono positive">{tl(odenen)}</td>
+                      <td className="td-mono positive">{tl(odened)}</td>
                       <td className={`td-mono ${kalan > 0 ? 'positive' : ''}`}>{tl(kalan)}</td>
                       <td>
                         <button className="btn btn-danger btn-sm" onClick={() => isciSil(i.id)}>Sil</button>

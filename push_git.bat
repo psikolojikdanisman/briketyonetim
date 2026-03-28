@@ -1,4 +1,5 @@
 @echo off
+chcp 65001
 REM ===============================
 REM Tek tıkla Git commit + push
 REM ===============================
