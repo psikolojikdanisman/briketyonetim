@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import type { AppData } from '@/types';
-import { tl, fd } from '@/lib/storage';
+import { tl, fd, buHafta, buAy, GIDER_LABEL } from '@/lib/storage';
 
 interface DashboardProps {
   data: AppData;
@@ -10,100 +10,135 @@ interface DashboardProps {
 export default function Dashboard({ data }: DashboardProps) {
   const chart1Ref = useRef<HTMLCanvasElement>(null);
   const chart2Ref = useRef<HTMLCanvasElement>(null);
-  const chart3Ref = useRef<HTMLCanvasElement>(null);
   const chart4Ref = useRef<HTMLCanvasElement>(null);
+  const chart5Ref = useRef<HTMLCanvasElement>(null);
   const chartsRef = useRef<Record<string, unknown>>({});
 
   const today = new Date().toISOString().split('T')[0];
-  const haftaBas = (() => {
-    const d = new Date();
-    const day = d.getDay();
-    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-    return d.toISOString().split('T')[0];
-  })();
+  const { bas: haftaBas } = buHafta();
+  const { bas: ayBas, bit: ayBit } = buAy();
 
+  // ── Üretim ──────────────────────────────────────────────────────────────
   const bugunUretim = data.uretimler
-    .filter((u) => u.tarih === today)
+    .filter(u => u.tarih === today)
     .reduce((s, u) => s + u.miktar, 0);
 
   const haftaUretim = data.uretimler
-    .filter((u) => u.tarih >= haftaBas)
+    .filter(u => u.tarih >= haftaBas)
     .reduce((s, u) => s + u.miktar, 0);
 
-  const acikSiparisler = data.siparisler.filter(
-    (s) => s.gonderilen < s.adet
-  ).length;
+  // ── Satış & Alacak ───────────────────────────────────────────────────────
+  const acikSiparisler = data.siparisler.filter(s => s.gonderilen < s.adet).length;
 
   const toplamAlacak = data.musteriler.reduce((s, m) => {
-    const tT = data.teslimatlar
-      .filter((t) => t.musteriId === m.id)
-      .reduce((a, t) => a + (t.tutar - t.tahsil), 0);
-    const oT = data.musteriOdemeler
-      .filter((o) => o.musteriId === m.id)
-      .reduce((a, o) => a + o.tutar, 0);
-    return s + Math.max(0, tT - oT);
+    const tT = data.teslimatlar.filter(t => t.musteriId === m.id).reduce((a, t) => a + (t.tutar - t.tahsil), 0);
+    const oT = data.musteriOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
+    const sT = data.spotSatislar.filter(x => x.musteriId === m.id).reduce((a, x) => a + (x.tutar - x.tahsil), 0);
+    const soT = data.spotOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
+    return s + Math.max(0, tT + sT - oT - soT);
   }, 0);
 
-  // Son üretimler (5 adet)
-  const sonUretimler = [...data.uretimler]
-    .sort((a, b) => b.tarih.localeCompare(a.tarih))
+  // ── Bu ay nakit akışı ────────────────────────────────────────────────────
+  const ayTeslimatGelir = data.teslimatlar
+    .filter(t => t.tarih >= ayBas && t.tarih <= ayBit)
+    .reduce((s, t) => s + t.tutar, 0);
+  const aySpotGelir = data.spotSatislar
+    .filter(s => s.tarih >= ayBas && s.tarih <= ayBit)
+    .reduce((s, x) => s + x.tutar, 0);
+  const ayToplamGelir = ayTeslimatGelir + aySpotGelir;
+
+  const ayTahsilat = [
+    ...data.teslimatlar.filter(t => t.tarih >= ayBas && t.tarih <= ayBit).map(t => t.tahsil),
+    ...data.musteriOdemeler.filter(o => o.tarih >= ayBas && o.tarih <= ayBit).map(o => o.tutar),
+    ...data.spotSatislar.filter(s => s.tarih >= ayBas && s.tarih <= ayBit).map(s => s.tahsil),
+    ...data.spotOdemeler.filter(o => o.tarih >= ayBas && o.tarih <= ayBit).map(o => o.tutar),
+  ].reduce((s, x) => s + x, 0);
+
+  const ayIsciOdeme = data.avanslar
+    .filter(a => a.tarih >= ayBas && a.tarih <= ayBit)
+    .reduce((s, a) => s + a.tutar, 0);
+
+  const ayMalzemeGider = data.malzemeler
+    .filter(m => m.tarih >= ayBas && m.tarih <= ayBit)
+    .reduce((s, m) => s + m.toplamTutar, 0);
+
+  const ayDigerGider = (data.giderler || [])
+    .filter(g => g.tarih >= ayBas && g.tarih <= ayBit)
+    .reduce((s, g) => s + g.tutar, 0);
+
+  const ayToplamGider = ayIsciOdeme + ayMalzemeGider + ayDigerGider;
+  const ayNetKar = ayTahsilat - ayToplamGider;
+
+  // ── Bu hafta işçi ────────────────────────────────────────────────────────
+  const haftaIsciBorc = data.isciler.reduce((s, i) => {
+    const kazanc =
+      data.uretimler.filter(u => u.tarih >= haftaBas && u.isciler.includes(i.id)).reduce((a, u) => a + u.kisiBasiUcret, 0) +
+      data.yuklemeler.filter(y => y.tarih >= haftaBas && y.isciler.includes(i.id)).reduce((a, y) => a + y.kisiBasiUcret, 0);
+    const odenen = data.avanslar.filter(a => a.isciId === i.id && a.tarih >= haftaBas).reduce((a, x) => a + x.tutar, 0);
+    return s + Math.max(0, kazanc - odenen);
+  }, 0);
+
+  // ── Tedarikçi borcu ──────────────────────────────────────────────────────
+  const tedarikBorc = data.tedarikciListesi
+    .filter(t => t.tur !== 'diger')
+    .map(t => {
+      const alinan = data.malzemeler.filter(m => m.tedarikciId === t.id).reduce((s, m) => s + m.toplamTutar, 0);
+      const odenen = data.tedarikOdemeler.filter(o => o.tedarikciId === t.id).reduce((s, o) => s + o.tutar, 0);
+      return { isim: t.isim, kalan: alinan - odenen };
+    })
+    .filter(t => t.kalan > 0);
+
+  const toplamTedarikBorc = tedarikBorc.reduce((s, t) => s + t.kalan, 0);
+
+  // ── Bu gün teslimatlar ───────────────────────────────────────────────────
+  const bugunTeslimatlar = data.teslimatlar
+    .filter(t => t.tarih === today)
     .slice(0, 5);
 
-  // Bekleyen siparişler
-  const bekleyenSiparisler = data.siparisler
-    .filter((s) => s.gonderilen < s.adet)
-    .slice(0, 5);
-
-  // Borçlu müşteriler
+  // ── Borçlu müşteriler ────────────────────────────────────────────────────
   const borcluMusteriler = data.musteriler
-    .map((m) => {
-      const tT = data.teslimatlar
-        .filter((t) => t.musteriId === m.id)
-        .reduce((a, t) => a + (t.tutar - t.tahsil), 0);
-      const oT = data.musteriOdemeler
-        .filter((o) => o.musteriId === m.id)
-        .reduce((a, o) => a + o.tutar, 0);
-      const alacak = Math.max(0, tT - oT);
-      const sonIslem = [...data.teslimatlar]
-        .filter((t) => t.musteriId === m.id)
-        .sort((a, b) => b.tarih.localeCompare(a.tarih))[0];
+    .map(m => {
+      const tT = data.teslimatlar.filter(t => t.musteriId === m.id).reduce((a, t) => a + (t.tutar - t.tahsil), 0);
+      const oT = data.musteriOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
+      const sT = data.spotSatislar.filter(x => x.musteriId === m.id).reduce((a, x) => a + (x.tutar - x.tahsil), 0);
+      const soT = data.spotOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
+      const alacak = Math.max(0, tT + sT - oT - soT);
+      const sonIslem = [...data.teslimatlar].filter(t => t.musteriId === m.id).sort((a, b) => b.tarih.localeCompare(a.tarih))[0];
       return { m, alacak, sonIslem };
     })
-    .filter((x) => x.alacak > 0)
+    .filter(x => x.alacak > 0)
     .sort((a, b) => b.alacak - a.alacak)
     .slice(0, 6);
 
+  // ── Grafikler ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const script = document.createElement('script');
-    script.src =
-      'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-    script.onload = () => drawCharts();
+    const load = () => drawCharts();
     if ((window as Record<string, unknown>).Chart) {
-      drawCharts();
+      load();
     } else {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+      script.onload = load;
       document.head.appendChild(script);
     }
     return () => {
       Object.values(chartsRef.current).forEach((c: unknown) => {
-        if (c && typeof (c as { destroy: () => void }).destroy === 'function') {
+        if (c && typeof (c as { destroy: () => void }).destroy === 'function')
           (c as { destroy: () => void }).destroy();
-        }
       });
     };
   }, [data]);
 
   function dGunler(n: number): string[] {
-    const arr = [];
-    for (let i = n - 1; i >= 0; i--) {
+    return Array.from({ length: n }, (_, i) => {
       const d = new Date();
-      d.setDate(d.getDate() - i);
-      arr.push(d.toISOString().split('T')[0]);
-    }
-    return arr;
+      d.setDate(d.getDate() - (n - 1 - i));
+      return d.toISOString().split('T')[0];
+    });
   }
 
-  function dKisaTarih(d: string): string {
+  function dKisa(d: string): string {
     const p = d.split('-');
     return p[2] + '.' + p[1];
   }
@@ -122,81 +157,56 @@ export default function Dashboard({ data }: DashboardProps) {
       },
     },
     scales: {
-      x: {
-        grid: { color: 'rgba(42,74,78,.4)' },
-        ticks: { color: '#3d7070', font: { size: 10 } },
-      },
-      y: {
-        grid: { color: 'rgba(42,74,78,.4)' },
-        ticks: { color: '#7abcba', font: { size: 10 } },
-        beginAtZero: true,
-      },
+      x: { grid: { color: 'rgba(42,74,78,.4)' }, ticks: { color: '#3d7070', font: { size: 10 } } },
+      y: { grid: { color: 'rgba(42,74,78,.4)' }, ticks: { color: '#7abcba', font: { size: 10 } }, beginAtZero: true },
     },
   };
 
   function drawCharts() {
-    const Chart = (window as Record<string, unknown>).Chart as {
-      new (ctx: HTMLCanvasElement, config: unknown): unknown;
-    };
+    const Chart = (window as Record<string, unknown>).Chart as { new(ctx: HTMLCanvasElement, config: unknown): unknown };
     if (!Chart) return;
-
     Object.values(chartsRef.current).forEach((c: unknown) => {
-      if (c && typeof (c as { destroy: () => void }).destroy === 'function') {
+      if (c && typeof (c as { destroy: () => void }).destroy === 'function')
         (c as { destroy: () => void }).destroy();
-      }
     });
 
     const gunler = dGunler(14);
 
-    // Chart 1 - Üretim
+    // Chart 1 — Üretim
     if (chart1Ref.current) {
       chartsRef.current.c1 = new Chart(chart1Ref.current, {
         type: 'bar',
         data: {
-          labels: gunler.map(dKisaTarih),
-          datasets: [
-            {
-              label: 'Üretim (adet)',
-              data: gunler.map((g) =>
-                data.uretimler
-                  .filter((u) => u.tarih === g)
-                  .reduce((s, u) => s + u.miktar, 0)
-              ),
-              backgroundColor: 'rgba(46,196,182,.55)',
-              borderColor: '#2ec4b6',
-              borderWidth: 0,
-              borderRadius: 4,
-            },
-          ],
+          labels: gunler.map(dKisa),
+          datasets: [{
+            label: 'Üretim (adet)',
+            data: gunler.map(g => data.uretimler.filter(u => u.tarih === g).reduce((s, u) => s + u.miktar, 0)),
+            backgroundColor: 'rgba(46,196,182,.55)',
+            borderColor: '#2ec4b6',
+            borderWidth: 0,
+            borderRadius: 4,
+          }],
         },
         options: { ...chartDefaults },
       });
     }
 
-    // Chart 2 - Satış
+    // Chart 2 — Satış
     if (chart2Ref.current) {
       chartsRef.current.c2 = new Chart(chart2Ref.current, {
         type: 'bar',
         data: {
-          labels: gunler.map(dKisaTarih),
+          labels: gunler.map(dKisa),
           datasets: [
             {
               label: 'Sipariş Teslimat',
-              data: gunler.map((g) =>
-                data.teslimatlar
-                  .filter((t) => t.tarih === g)
-                  .reduce((s, t) => s + t.adet, 0)
-              ),
+              data: gunler.map(g => data.teslimatlar.filter(t => t.tarih === g).reduce((s, t) => s + t.adet, 0)),
               backgroundColor: 'rgba(106,176,216,.6)',
               borderRadius: 3,
             },
             {
               label: 'Spot Satış',
-              data: gunler.map((g) =>
-                data.spotSatislar
-                  .filter((s) => s.tarih === g)
-                  .reduce((s, x) => s + x.adet, 0)
-              ),
+              data: gunler.map(g => data.spotSatislar.filter(s => s.tarih === g).reduce((s, x) => s + x.adet, 0)),
               backgroundColor: 'rgba(77,217,172,.6)',
               borderRadius: 3,
             },
@@ -205,79 +215,31 @@ export default function Dashboard({ data }: DashboardProps) {
         options: {
           ...chartDefaults,
           plugins: {
-            legend: {
-              display: true,
-              labels: { color: '#7abcba', font: { size: 11 }, boxWidth: 12 },
-            },
+            legend: { display: true, labels: { color: '#7abcba', font: { size: 11 }, boxWidth: 12 } },
             tooltip: chartDefaults.plugins.tooltip,
           },
         },
       });
     }
 
-    // Chart 3 - Çeşit
-    if (chart3Ref.current) {
-      const sinir = new Date();
-      sinir.setDate(sinir.getDate() - 29);
-      const sinirStr = sinir.toISOString().split('T')[0];
-      chartsRef.current.c3 = new Chart(chart3Ref.current, {
-        type: 'bar',
-        data: {
-          labels: ["10'luk", "15'lik", "20'lik"],
-          datasets: [
-            {
-              data: ['10luk', '15lik', '20lik'].map((c) =>
-                data.uretimler
-                  .filter((u) => u.tarih >= sinirStr && u.cesit === c)
-                  .reduce((s, u) => s + u.miktar, 0)
-              ),
-              backgroundColor: [
-                'rgba(106,176,216,.7)',
-                'rgba(46,196,182,.7)',
-                'rgba(77,217,172,.7)',
-              ],
-              borderColor: ['#6ab0d8', '#2ec4b6', '#4dd9ac'],
-              borderWidth: 1,
-              borderRadius: 5,
-            },
-          ],
-        },
-        options: {
-          ...chartDefaults,
-          indexAxis: 'y',
-          plugins: {
-            legend: { display: false },
-            tooltip: chartDefaults.plugins.tooltip,
-          },
-        },
-      });
-    }
-
-    // Chart 4 - Tahsilat
+    // Chart 4 — Aylık Tahsilat vs Satış
     if (chart4Ref.current) {
       const ayAd = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
       const now2 = new Date();
       const aylar = Array.from({ length: 6 }, (_, i) => {
         const d = new Date(now2.getFullYear(), now2.getMonth() - (5 - i), 1);
-        return {
-          str: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'),
-          lbl: ayAd[d.getMonth()],
-        };
+        return { str: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), lbl: ayAd[d.getMonth()] };
       });
       chartsRef.current.c4 = new Chart(chart4Ref.current, {
         type: 'bar',
         data: {
-          labels: aylar.map((a) => a.lbl),
+          labels: aylar.map(a => a.lbl),
           datasets: [
             {
               label: 'Toplam Satış',
-              data: aylar.map((a) =>
-                data.teslimatlar
-                  .filter((t) => t.tarih.startsWith(a.str))
-                  .reduce((s, t) => s + t.tutar, 0) +
-                data.spotSatislar
-                  .filter((s) => s.tarih.startsWith(a.str))
-                  .reduce((s, x) => s + x.tutar, 0)
+              data: aylar.map(a =>
+                data.teslimatlar.filter(t => t.tarih.startsWith(a.str)).reduce((s, t) => s + t.tutar, 0) +
+                data.spotSatislar.filter(s => s.tarih.startsWith(a.str)).reduce((s, x) => s + x.tutar, 0)
               ),
               backgroundColor: 'rgba(106,176,216,.5)',
               borderColor: '#6ab0d8',
@@ -286,13 +248,11 @@ export default function Dashboard({ data }: DashboardProps) {
             },
             {
               label: 'Tahsilat',
-              data: aylar.map((a) =>
-                data.teslimatlar
-                  .filter((t) => t.tarih.startsWith(a.str))
-                  .reduce((s, t) => s + t.tahsil, 0) +
-                data.musteriOdemeler
-                  .filter((o) => o.tarih.startsWith(a.str))
-                  .reduce((s, o) => s + o.tutar, 0)
+              data: aylar.map(a =>
+                data.teslimatlar.filter(t => t.tarih.startsWith(a.str)).reduce((s, t) => s + t.tahsil, 0) +
+                data.musteriOdemeler.filter(o => o.tarih.startsWith(a.str)).reduce((s, o) => s + o.tutar, 0) +
+                data.spotSatislar.filter(s => s.tarih.startsWith(a.str)).reduce((s, x) => s + x.tahsil, 0) +
+                data.spotOdemeler.filter(o => o.tarih.startsWith(a.str)).reduce((s, o) => s + o.tutar, 0)
               ),
               backgroundColor: 'rgba(77,217,172,.6)',
               borderColor: '#4dd9ac',
@@ -304,10 +264,40 @@ export default function Dashboard({ data }: DashboardProps) {
         options: {
           ...chartDefaults,
           plugins: {
-            legend: {
-              display: true,
-              labels: { color: '#7abcba', font: { size: 11 }, boxWidth: 12 },
-            },
+            legend: { display: true, labels: { color: '#7abcba', font: { size: 11 }, boxWidth: 12 } },
+            tooltip: chartDefaults.plugins.tooltip,
+          },
+        },
+      });
+    }
+
+    // Chart 5 — Bu ay gider dağılımı (donut)
+    if (chart5Ref.current) {
+      const ayGiderler = (data.giderler || []).filter(g => g.tarih >= ayBas && g.tarih <= ayBit);
+      const katLabels = ['Makine Bakım', 'Kamyon Bakım', 'Mazot', 'İşçi Ödemeleri', 'Malzeme', 'Diğer'];
+      const katData = [
+        ayGiderler.filter(g => g.kategori === 'makine_bakim').reduce((s, g) => s + g.tutar, 0),
+        ayGiderler.filter(g => g.kategori === 'kamyon_bakim').reduce((s, g) => s + g.tutar, 0),
+        ayGiderler.filter(g => g.kategori === 'mazot').reduce((s, g) => s + g.tutar, 0),
+        ayIsciOdeme,
+        ayMalzemeGider,
+        ayGiderler.filter(g => g.kategori === 'diger').reduce((s, g) => s + g.tutar, 0),
+      ];
+      chartsRef.current.c5 = new Chart(chart5Ref.current, {
+        type: 'doughnut',
+        data: {
+          labels: katLabels,
+          datasets: [{
+            data: katData,
+            backgroundColor: ['#f6c90e','#2ec4b6','#4dd9ac','#6ab0d8','#a78bfa','#94a3b8'],
+            borderWidth: 0,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true, position: 'right', labels: { color: '#7abcba', font: { size: 10 }, boxWidth: 10 } },
             tooltip: chartDefaults.plugins.tooltip,
           },
         },
@@ -317,20 +307,16 @@ export default function Dashboard({ data }: DashboardProps) {
 
   return (
     <div>
-      {/* Stat Grid */}
+      {/* ── Ana Stat Kartları ── */}
       <div className="stat-grid">
         <div className="stat-card">
           <div className="stat-label">Bugün Üretim</div>
-          <div className="stat-value c-accent">
-            {bugunUretim.toLocaleString('tr-TR')}
-          </div>
+          <div className="stat-value c-accent">{bugunUretim.toLocaleString('tr-TR')}</div>
           <div className="stat-sub">adet briket</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Bu Hafta Üretim</div>
-          <div className="stat-value">
-            {haftaUretim.toLocaleString('tr-TR')}
-          </div>
+          <div className="stat-value">{haftaUretim.toLocaleString('tr-TR')}</div>
           <div className="stat-sub">adet</div>
         </div>
         <div className="stat-card">
@@ -339,174 +325,205 @@ export default function Dashboard({ data }: DashboardProps) {
           <div className="stat-sub">bekleyen</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Toplam Alacak</div>
-          <div className="stat-value c-red">
-            {Math.round(toplamAlacak).toLocaleString('tr-TR')}
-          </div>
+          <div className="stat-label">Müşteri Alacağı</div>
+          <div className="stat-value c-red">{Math.round(toplamAlacak).toLocaleString('tr-TR')}</div>
           <div className="stat-sub">TL</div>
         </div>
       </div>
 
-      {/* Grafikler */}
+      {/* ── Grafikler: Üretim + Satış ── */}
       <div className="two-col" style={{ marginBottom: 16 }}>
         <div className="panel">
-          <div className="panel-header">
-            <div className="panel-title">Son 14 Gün — Üretim</div>
-          </div>
+          <div className="panel-header"><div className="panel-title">Son 14 Gün — Üretim</div></div>
           <div className="panel-body" style={{ padding: '14px 18px', height: 220 }}>
             <canvas ref={chart1Ref} />
           </div>
         </div>
         <div className="panel">
-          <div className="panel-header">
-            <div className="panel-title">Son 14 Gün — Satış (Adet)</div>
-          </div>
+          <div className="panel-header"><div className="panel-title">Son 14 Gün — Satış (Adet)</div></div>
           <div className="panel-body" style={{ padding: '14px 18px', height: 220 }}>
             <canvas ref={chart2Ref} />
           </div>
         </div>
       </div>
 
-      <div className="two-col" style={{ marginBottom: 16 }}>
-        <div className="panel">
-          <div className="panel-header">
-            <div className="panel-title">Briket Çeşidine Göre (Son 30 Gün)</div>
+      {/* ── Bu Ay Nakit Akışı ── */}
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <div className="panel-header"><div className="panel-title">Bu Ay — Nakit Akışı</div></div>
+        <div className="panel-body">
+          <div className="stat-grid">
+            <div className="stat-card">
+              <div className="stat-label">Toplam Satış</div>
+              <div className="stat-value c-accent" style={{ fontSize: 20 }}>{tl(ayToplamGelir)}</div>
+              <div className="stat-sub">faturalanan</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Tahsilat</div>
+              <div className="stat-value c-green" style={{ fontSize: 20 }}>{tl(ayTahsilat)}</div>
+              <div className="stat-sub">nakit giren</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Toplam Gider</div>
+              <div className="stat-value c-red" style={{ fontSize: 20 }}>{tl(ayToplamGider)}</div>
+              <div className="stat-sub">işçi + malzeme + diğer</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Net (Tahsilat − Gider)</div>
+              <div className={`stat-value ${ayNetKar >= 0 ? 'c-green' : 'c-red'}`} style={{ fontSize: 20 }}>{tl(ayNetKar)}</div>
+              <div className="stat-sub">tahmini</div>
+            </div>
           </div>
-          <div className="panel-body" style={{ padding: '14px 18px', height: 200 }}>
-            <canvas ref={chart3Ref} />
+
+          {/* Gider detay satırı */}
+          <div style={{
+            display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12,
+            padding: '10px 14px', background: 'var(--surface)', borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)', fontSize: 12, fontFamily: 'IBM Plex Mono, monospace',
+          }}>
+            <span style={{ color: 'var(--text3)', marginRight: 4 }}>Gider dağılımı:</span>
+            <span>İşçi <span style={{ color: 'var(--danger)' }}>{tl(ayIsciOdeme)}</span></span>
+            <span style={{ color: 'var(--border)' }}>|</span>
+            <span>Malzeme <span style={{ color: 'var(--danger)' }}>{tl(ayMalzemeGider)}</span></span>
+            <span style={{ color: 'var(--border)' }}>|</span>
+            <span>Diğer Giderler <span style={{ color: 'var(--danger)' }}>{tl(ayDigerGider)}</span></span>
           </div>
         </div>
+      </div>
+
+      {/* ── Tahsilat Grafiği + Gider Donut ── */}
+      <div className="two-col" style={{ marginBottom: 16 }}>
         <div className="panel">
-          <div className="panel-header">
-            <div className="panel-title">Aylık Tahsilat vs Alacak</div>
-          </div>
-          <div className="panel-body" style={{ padding: '14px 18px', height: 200 }}>
+          <div className="panel-header"><div className="panel-title">Aylık Tahsilat vs Satış</div></div>
+          <div className="panel-body" style={{ padding: '14px 18px', height: 220 }}>
             <canvas ref={chart4Ref} />
           </div>
         </div>
+        <div className="panel">
+          <div className="panel-header"><div className="panel-title">Bu Ay Gider Dağılımı</div></div>
+          <div className="panel-body" style={{ padding: '14px 18px', height: 220 }}>
+            <canvas ref={chart5Ref} />
+          </div>
+        </div>
       </div>
 
-      {/* Tablolar */}
+      {/* ── İşçi + Tedarikçi Borç ── */}
+      <div className="two-col" style={{ marginBottom: 16 }}>
+        <div className="panel">
+          <div className="panel-header">
+            <div className="panel-title">Bu Hafta İşçi Durumu</div>
+            <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              Toplam borç: <strong style={{ color: 'var(--danger)' }}>{tl(haftaIsciBorc)}</strong>
+            </span>
+          </div>
+          <div className="panel-body-0">
+            <table>
+              <thead>
+                <tr><th>İşçi</th><th>Kazanç</th><th>Ödenen</th><th>Kalan</th></tr>
+              </thead>
+              <tbody>
+                {data.isciler.length === 0 ? (
+                  <tr><td colSpan={4} className="empty">İşçi yok</td></tr>
+                ) : data.isciler.map(i => {
+                  const kazanc =
+                    data.uretimler.filter(u => u.tarih >= haftaBas && u.isciler.includes(i.id)).reduce((s, u) => s + u.kisiBasiUcret, 0) +
+                    data.yuklemeler.filter(y => y.tarih >= haftaBas && y.isciler.includes(i.id)).reduce((s, y) => s + y.kisiBasiUcret, 0);
+                  const odenen = data.avanslar.filter(a => a.isciId === i.id && a.tarih >= haftaBas).reduce((s, a) => s + a.tutar, 0);
+                  const kalan = kazanc - odenen;
+                  return (
+                    <tr key={i.id}>
+                      <td className="td-bold">{i.isim}</td>
+                      <td className="td-mono">{tl(kazanc)}</td>
+                      <td className="td-mono positive">{tl(odenen)}</td>
+                      <td className={`td-mono ${kalan > 0 ? 'positive' : ''}`}>{tl(kalan)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div className="panel-title">Tedarikçi Borç Durumu</div>
+            <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              Toplam: <strong style={{ color: 'var(--danger)' }}>{tl(toplamTedarikBorc)}</strong>
+            </span>
+          </div>
+          <div className="panel-body-0">
+            <table>
+              <thead>
+                <tr><th>Tedarikçi</th><th>Kalan Borç</th></tr>
+              </thead>
+              <tbody>
+                {tedarikBorc.length === 0 ? (
+                  <tr><td colSpan={2} className="empty">Borç yok</td></tr>
+                ) : tedarikBorc.map(t => (
+                  <tr key={t.isim}>
+                    <td className="td-bold">{t.isim}</td>
+                    <td className="td-mono negative">{tl(t.kalan)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Bugün Teslimatlar + Borçlu Müşteriler ── */}
       <div className="two-col">
         <div className="panel">
-          <div className="panel-header">
-            <div className="panel-title">Son Üretimler</div>
-          </div>
+          <div className="panel-header"><div className="panel-title">Bugün Teslimatlar</div></div>
           <div className="panel-body-0">
             <table>
               <thead>
-                <tr>
-                  <th>Tarih</th>
-                  <th>Miktar</th>
-                  <th>Çeşit</th>
-                  <th>K.Başı ₺</th>
-                </tr>
+                <tr><th>Müşteri</th><th>Ürün</th><th>Tutar</th><th>Durum</th></tr>
               </thead>
               <tbody>
-                {sonUretimler.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="empty">
-                      Kayıt yok
-                    </td>
-                  </tr>
-                ) : (
-                  sonUretimler.map((u) => (
-                    <tr key={u.id}>
-                      <td>{fd(u.tarih)}</td>
-                      <td className="td-mono">
-                        {u.miktar.toLocaleString('tr-TR')}
-                      </td>
+                {bugunTeslimatlar.length === 0 ? (
+                  <tr><td colSpan={4} className="empty">Bugün teslimat yok</td></tr>
+                ) : bugunTeslimatlar.map(t => {
+                  const m = data.musteriler.find(x => x.id === t.musteriId);
+                  const k = t.tutar - t.tahsil;
+                  return (
+                    <tr key={t.id}>
+                      <td className="td-bold">{m?.isim || '?'}</td>
+                      <td><span className="badge b-yellow">{t.cesit}</span></td>
+                      <td className="td-mono">{tl(t.tutar)}</td>
                       <td>
-                        <span className="badge b-yellow">{u.cesit}</span>
+                        <span className={`badge ${k <= 0 ? 'b-green' : t.tahsil > 0 ? 'b-yellow' : 'b-red'}`}>
+                          {k <= 0 ? 'Ödendi' : t.tahsil > 0 ? 'Kısmi' : 'Borçlu'}
+                        </span>
                       </td>
-                      <td className="td-mono">{tl(u.kisiBasiUcret)}</td>
                     </tr>
-                  ))
-                )}
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
+
         <div className="panel">
-          <div className="panel-header">
-            <div className="panel-title">Bekleyen Siparişler</div>
-          </div>
+          <div className="panel-header"><div className="panel-title">Borçlu Müşteriler</div></div>
           <div className="panel-body-0">
             <table>
               <thead>
-                <tr>
-                  <th>Müşteri</th>
-                  <th>Çeşit</th>
-                  <th>Kalan</th>
-                  <th>Bölge</th>
-                </tr>
+                <tr><th>Müşteri</th><th>Köy</th><th>Alacak</th><th>Son İşlem</th></tr>
               </thead>
               <tbody>
-                {bekleyenSiparisler.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="empty">
-                      Bekleyen sipariş yok
-                    </td>
-                  </tr>
-                ) : (
-                  bekleyenSiparisler.map((s) => {
-                    const m = data.musteriler.find(
-                      (x) => x.id === s.musteriId
-                    );
-                    return (
-                      <tr key={s.id}>
-                        <td className="td-bold">{m?.isim || '?'}</td>
-                        <td>
-                          <span className="badge b-yellow">{s.cesit}</span>
-                        </td>
-                        <td className="td-mono">
-                          {(s.adet - s.gonderilen).toLocaleString('tr-TR')}
-                        </td>
-                        <td>{s.bolge || '—'}</td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* Borçlu Müşteriler */}
-      <div className="panel">
-        <div className="panel-header">
-          <div className="panel-title">Borçlu Müşteriler</div>
-        </div>
-        <div className="panel-body-0">
-          <table>
-            <thead>
-              <tr>
-                <th>Müşteri</th>
-                <th>Bölge</th>
-                <th>Alacak</th>
-                <th>Son İşlem</th>
-              </tr>
-            </thead>
-            <tbody>
-              {borcluMusteriler.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="empty">
-                    Borçlu müşteri yok
-                  </td>
-                </tr>
-              ) : (
-                borcluMusteriler.map(({ m, alacak, sonIslem }) => (
+                {borcluMusteriler.length === 0 ? (
+                  <tr><td colSpan={4} className="empty">Borçlu müşteri yok</td></tr>
+                ) : borcluMusteriler.map(({ m, alacak, sonIslem }) => (
                   <tr key={m.id}>
                     <td className="td-bold">{m.isim}</td>
-                    <td>{m.bolge || '—'}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text2)' }}>{m.koy || m.bolge || '—'}</td>
                     <td className="td-mono negative">{tl(alacak)}</td>
                     <td>{sonIslem ? fd(sonIslem.tarih) : '—'}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

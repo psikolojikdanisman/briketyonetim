@@ -98,12 +98,14 @@ export interface MusteriOdeme {
 
 export interface Malzeme {
   id: number;
-  tur: 'micir' | 'cimento' | 'diger';
+  tur: 'micir' | 'cimento';
   tarih: string;
   tirlar: { miktar: number; fiyat: number }[];
   toplamMiktar: number;
   toplamTutar: number;
   tedarikci?: string;
+  tedarikciId?: number;
+  gecmisBorcMu?: boolean;
   not?: string;
 }
 
@@ -152,6 +154,21 @@ export interface SpotOdeme {
   aciklama?: string;
 }
 
+export type GiderKategori =
+  | 'makine_bakim'
+  | 'kamyon_bakim'
+  | 'mazot'
+  | 'diger';
+
+export interface Gider {
+  id: number;
+  tarih: string;
+  kategori: GiderKategori;
+  kategoriIsim?: string;
+  tutar: number;
+  aciklama?: string;
+}
+
 export interface FiyatTarifeleri {
   '10luk': { merkez: number; yakin: number };
   '15lik': { merkez: number; yakin: number };
@@ -189,6 +206,7 @@ export interface AppData {
   koyler: Koy[];
   spotSatislar: SpotSatis[];
   spotOdemeler: SpotOdeme[];
+  giderler: Gider[];
 }
 
 export type PageKey =
@@ -196,10 +214,10 @@ export type PageKey =
   | 'uretim'
   | 'yukleme'
   | 'isciler'
-  | 'haftalik'
   | 'siparisler'
   | 'spotsatis'
   | 'musteriler'
   | 'malzeme'
+  | 'giderler'
   | 'koyler'
   | 'ayarlar';

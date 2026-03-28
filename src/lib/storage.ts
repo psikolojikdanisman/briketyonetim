@@ -37,6 +37,7 @@ export const defaultData: AppData = {
   koyler: [],
   spotSatislar: [],
   spotOdemeler: [],
+  giderler: [],
 };
 
 export function loadData(): AppData {
@@ -46,13 +47,13 @@ export function loadData(): AppData {
     if (!raw) return { ...defaultData };
     const parsed = JSON.parse(raw);
     const merged: AppData = { ...defaultData, ...parsed };
-    // Ensure nested defaults
     if (!merged.ayarlar.fp) merged.ayarlar.fp = defaultAyarlar.fp;
     if (!merged.tedarikOdemeler) merged.tedarikOdemeler = [];
     if (!merged.tedarikciListesi) merged.tedarikciListesi = [];
     if (!merged.koyler) merged.koyler = [];
     if (!merged.spotSatislar) merged.spotSatislar = [];
     if (!merged.spotOdemeler) merged.spotOdemeler = [];
+    if (!merged.giderler) merged.giderler = [];
     return merged;
   } catch {
     return { ...defaultData };
@@ -64,7 +65,7 @@ export function saveData(data: AppData): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
-    // quota exceeded veya benzeri
+    // quota exceeded
   }
 }
 
@@ -100,10 +101,17 @@ export const buHafta = (): { bas: string; bit: string } => {
   };
 };
 
-export const birimUcret = (
-  cesit: string,
-  ayarlar: Ayarlar
-): number => {
+export const buAy = (): { bas: string; bit: string } => {
+  const now = new Date();
+  const bas = new Date(now.getFullYear(), now.getMonth(), 1);
+  const bit = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    bas: bas.toISOString().split('T')[0],
+    bit: bit.toISOString().split('T')[0],
+  };
+};
+
+export const birimUcret = (cesit: string, ayarlar: Ayarlar): number => {
   const map: Record<string, number> = {
     '10luk': ayarlar.ucret10,
     '15lik': ayarlar.ucret15,
@@ -112,10 +120,7 @@ export const birimUcret = (
   return map[cesit] || 0;
 };
 
-export const yukBirimUcret = (
-  tur: string,
-  ayarlar: Ayarlar
-): number => {
+export const yukBirimUcret = (tur: string, ayarlar: Ayarlar): number => {
   const map: Record<string, number> = {
     yukleme: ayarlar.ucretYukleme,
     bosaltma: ayarlar.ucretBosaltma,
@@ -145,6 +150,12 @@ export const SIP_BIRIM: Record<string, string> = {
 export const TURADI: Record<string, string> = {
   cimento: 'Çimento',
   micir: 'Mıcır',
+};
+
+export const GIDER_LABEL: Record<string, string> = {
+  makine_bakim: 'Makine Bakım / Tamirat',
+  kamyon_bakim: 'Kamyon Bakım / Tamirat',
+  mazot: 'Mazot',
   diger: 'Diğer',
 };
 
@@ -153,11 +164,11 @@ export const PAGE_TITLES: Record<string, string> = {
   uretim: 'GÜNLÜK ÜRETİM',
   yukleme: 'YÜKLEME / BOŞALTMA',
   isciler: 'İŞÇİ YÖNETİMİ',
-  haftalik: 'HAFTALIK HESAP',
   siparisler: 'SİPARİŞLER',
   spotsatis: 'SPOT SATIŞ',
   musteriler: 'MÜŞTERİLER & BORÇ',
   malzeme: 'MALZEME GİRİŞİ',
+  giderler: 'GİDERLER',
   koyler: 'KÖY / BÖLGE YÖNETİMİ',
   ayarlar: 'ÜCRET TARİFELERİ',
 };

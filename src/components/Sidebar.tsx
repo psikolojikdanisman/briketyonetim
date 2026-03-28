@@ -17,29 +17,31 @@ const NAV_ITEMS: {
   {
     section: 'ÜRETİM & İŞÇİLER',
     items: [
-      { key: 'uretim', icon: '🏭', label: 'Günlük Üretim' },
+      { key: 'uretim',  icon: '🏭', label: 'Günlük Üretim' },
       { key: 'yukleme', icon: '🚛', label: 'Yükleme / Boşaltma' },
       { key: 'isciler', icon: '👷', label: 'İşçi Yönetimi' },
-      { key: 'haftalik', icon: '📋', label: 'Haftalık Hesap' },
     ],
   },
   {
     section: 'SATIŞ',
     items: [
       { key: 'siparisler', icon: '📦', label: 'Siparişler' },
-      { key: 'spotsatis', icon: '🚜', label: 'Spot Satış' },
+      { key: 'spotsatis',  icon: '🚜', label: 'Spot Satış' },
       { key: 'musteriler', icon: '👤', label: 'Müşteriler & Borç' },
     ],
   },
   {
-    section: 'STOK',
-    items: [{ key: 'malzeme', icon: '🪨', label: 'Malzeme Girişi' }],
+    section: 'STOK & GİDER',
+    items: [
+      { key: 'malzeme',  icon: '🪨', label: 'Malzeme Girişi' },
+      { key: 'giderler', icon: '💸', label: 'Giderler' },
+    ],
   },
   {
     section: 'AYARLAR',
     items: [
-      { key: 'koyler', icon: '🏘', label: 'Köy / Bölge Yönetimi' },
-      { key: 'ayarlar', icon: '⚙', label: 'Ücret Tarifeleri' },
+      { key: 'koyler',  icon: '🏘', label: 'Köy / Bölge Yönetimi' },
+      { key: 'ayarlar', icon: '⚙',  label: 'Ücret Tarifeleri' },
     ],
   },
 ];

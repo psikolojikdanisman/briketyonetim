@@ -8,11 +8,11 @@ import Dashboard from './pages/Dashboard';
 import UretimPage from './pages/Uretim';
 import YuklemePage from './pages/Yukleme';
 import IscilerPage from './pages/Isciler';
-import HaftalikPage from './pages/Haftalik';
 import SiparislerPage from './pages/Siparisler';
 import SpotSatisPage from './pages/SpotSatis';
 import MusterilerPage from './pages/Musteriler';
 import MalzemePage from './pages/Malzeme';
+import GiderlerPage from './pages/Giderler';
 import KoylerPage from './pages/Koyler';
 import AyarlarPage from './pages/Ayarlar';
 
@@ -22,7 +22,6 @@ export default function BriketApp() {
   const [toast, setToast] = useState<ToastState>({ message: '', ok: true, visible: false });
   const [dateStr, setDateStr] = useState('');
 
-  // Yalnızca client tarafında yükle
   useEffect(() => {
     setData(loadData());
     const now = new Date();
@@ -67,17 +66,17 @@ export default function BriketApp() {
         </div>
 
         <div className="content">
-          {page === 'dashboard' && <Dashboard data={data} />}
-          {page === 'uretim' && <UretimPage {...pageProps} />}
-          {page === 'yukleme' && <YuklemePage {...pageProps} />}
-          {page === 'isciler' && <IscilerPage {...pageProps} />}
-          {page === 'haftalik' && <HaftalikPage {...pageProps} />}
+          {page === 'dashboard'  && <Dashboard data={data} />}
+          {page === 'uretim'     && <UretimPage {...pageProps} />}
+          {page === 'yukleme'    && <YuklemePage {...pageProps} />}
+          {page === 'isciler'    && <IscilerPage {...pageProps} />}
           {page === 'siparisler' && <SiparislerPage {...pageProps} />}
-          {page === 'spotsatis' && <SpotSatisPage {...pageProps} />}
+          {page === 'spotsatis'  && <SpotSatisPage {...pageProps} />}
           {page === 'musteriler' && <MusterilerPage {...pageProps} />}
-          {page === 'malzeme' && <MalzemePage {...pageProps} />}
-          {page === 'koyler' && <KoylerPage {...pageProps} />}
-          {page === 'ayarlar' && <AyarlarPage {...pageProps} />}
+          {page === 'malzeme'    && <MalzemePage {...pageProps} />}
+          {page === 'giderler'   && <GiderlerPage {...pageProps} />}
+          {page === 'koyler'     && <KoylerPage {...pageProps} />}
+          {page === 'ayarlar'    && <AyarlarPage {...pageProps} />}
         </div>
       </div>
 
