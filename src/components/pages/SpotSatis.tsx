@@ -11,22 +11,15 @@ interface SpotSatisProps {
   showToast: (msg: string, ok?: boolean) => void;
 }
 
-type Konum = 'merkez' | 'yakin' | 'uzak' | 'yerinde';
-
-const KONUM_SECENEKLER: { value: Konum; label: string }[] = [
-  { value: 'yerinde', label: 'Yerinde (fabrikadan alıyor)' },
-  { value: 'merkez', label: 'Merkez' },
-  { value: 'yakin', label: 'Yakın' },
-  { value: 'uzak', label: 'Uzak' },
-];
-
 export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProps) {
   const [musteriId, setMusteriId] = useState('');
   const [tarih, setTarih] = useState(today());
   const [cesit, setCesit] = useState('20lik');
   const [adet, setAdet] = useState('');
-  const [fiyat, setFiyat] = useState('');
-  const [konum, setKonum] = useState<Konum>('yerinde');
+  const [fiyat, setFiyat] = useState(() => {
+    const fp = data.ayarlar.fp;
+    return String(fp?.yerinde || '');
+  });
   const [odeme, setOdeme] = useState('pesin');
   const [tahsil, setTahsil] = useState('');
   const [notVal, setNotVal] = useState('');
@@ -44,29 +37,19 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
   const tutar = (parseFloat(adet) || 0) * (parseFloat(fiyat) || 0);
   const tahsilTutar = odeme === 'pesin' ? tutar : odeme === 'kismi' ? (parseFloat(tahsil) || 0) : 0;
 
-  // Konuma göre varsayılan fiyatı getir
-  function varsayilanFiyat(k: Konum, c: string): string {
+  // Çeşit değişince varsayılan fiyatı doldur
+  function varsayilanFiyat(c: string): string {
     const fp = data.ayarlar.fp;
+    if (!fp) return '';
     if (c === 'cimento') return String(fp.cimento || '');
     if (c === 'kum') return String(fp.kum || '');
-    // briket türleri için konum bazlı fiyat
-    const fiyatMap: Record<Konum, number> = {
-      merkez: fp.merkez,
-      yakin: fp.yakin,
-      uzak: fp.uzak,
-      yerinde: fp.yerinde,
-    };
-    return String(fiyatMap[k] || '');
-  }
-
-  function handleKonumDegis(k: Konum) {
-    setKonum(k);
-    setFiyat(varsayilanFiyat(k, cesit));
+    // briket türleri → yerinde fiyatı
+    return String(fp.yerinde || '');
   }
 
   function handleCesitDegis(c: string) {
     setCesit(c);
-    setFiyat(varsayilanFiyat(konum, c));
+    setFiyat(varsayilanFiyat(c));
   }
 
   function spotBorc(mid: number) {
@@ -103,12 +86,12 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
       id: uid(), musteriId: parseInt(musteriId),
       tarih, cesit, adet: a, birimFiyat: f, tutar: a * f,
       tahsil: tahsilTutar,
-      konum,
-      koy: '', adres: '', bolge: konum,
+      konum: 'yerinde',
+      koy: '', adres: '', bolge: 'yerinde',
       not: notVal, birim: SIP_BIRIM[cesit] || 'adet',
     };
     onSave({ ...data, spotSatislar: [...data.spotSatislar, yeni] });
-    setAdet(''); setFiyat(''); setTahsil(''); setNotVal('');
+    setAdet(''); setFiyat(varsayilanFiyat(cesit)); setTahsil(''); setNotVal('');
     showToast('Spot satış kaydedildi ✓');
   }
 
@@ -187,23 +170,6 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
               <div><label>Miktar ({SIP_BIRIM[cesit] || 'adet'})</label><input type="number" placeholder="0" value={adet} onChange={e => setAdet(e.target.value)} /></div>
             </div>
 
-            {/* Konum seçimi */}
-            <div>
-              <label>Konum</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {KONUM_SECENEKLER.map(k => (
-                  <button
-                    key={k.value}
-                    type="button"
-                    className={`btn btn-sm ${konum === k.value ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => handleKonumDegis(k.value)}
-                  >
-                    {k.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="frow c2">
               <div>
                 <label>Birim Fiyat (TL)</label>
@@ -214,9 +180,20 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
                   value={fiyat}
                   onChange={e => setFiyat(e.target.value)}
                 />
-                {fiyat && (
+                {data.ayarlar.fp && varsayilanFiyat(cesit) && fiyat !== varsayilanFiyat(cesit) && (
+                  <div style={{ fontSize: 11, color: 'var(--warning, #e67e22)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    ✎ Değiştirildi
+                    <button
+                      style={{ fontSize: 10, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', textDecoration: 'underline' }}
+                      onClick={() => setFiyat(varsayilanFiyat(cesit))}
+                    >
+                      sıfırla
+                    </button>
+                  </div>
+                )}
+                {fiyat && fiyat === varsayilanFiyat(cesit) && (
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>
-                    {KONUM_LABEL[konum]} fiyatı
+                    Varsayılan fiyat
                   </div>
                 )}
               </div>
@@ -302,11 +279,11 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Tarih</th><th>Müşteri</th><th>Ürün</th><th>Konum</th><th>Miktar</th><th>Birim Fiyat</th><th>Tutar</th><th>Tahsil</th><th>Kalan</th><th>Durum</th><th></th></tr>
+                <tr><th>Tarih</th><th>Müşteri</th><th>Ürün</th><th>Miktar</th><th>Birim Fiyat</th><th>Tutar</th><th>Tahsil</th><th>Kalan</th><th>Durum</th><th></th></tr>
               </thead>
               <tbody>
                 {data.spotSatislar.length === 0 ? (
-                  <tr><td colSpan={11} className="empty">Kayıt yok</td></tr>
+                  <tr><td colSpan={10} className="empty">Kayıt yok</td></tr>
                 ) : [...data.spotSatislar].reverse().map(s => {
                   const m = data.musteriler.find(x => x.id === s.musteriId);
                   const k = s.tutar - s.tahsil;
@@ -317,7 +294,6 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
                       <td>{fd(s.tarih)}</td>
                       <td className="td-bold">{m?.isim || '?'}</td>
                       <td><span className="badge b-yellow">{SIP_CESIT_LABEL[s.cesit] || s.cesit}</span></td>
-                      <td><span className="badge b-gray">{KONUM_LABEL[s.konum || s.bolge || ''] || '—'}</span></td>
                       <td className="td-mono">{s.adet.toLocaleString('tr-TR')} {s.birim || 'adet'}</td>
                       <td className="td-mono">{s.birimFiyat.toFixed(2)} TL</td>
                       <td className="td-mono">{tl(s.tutar)}</td>

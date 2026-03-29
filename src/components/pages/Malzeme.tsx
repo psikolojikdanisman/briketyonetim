@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { AppData, Malzeme } from '@/types';
 import { tl, fd, today, uid, TURADI } from '@/lib/storage';
 import { makbuzIndir } from '@/lib/pdfMakbuz';
@@ -12,9 +12,174 @@ interface MalzemeProps {
 
 interface TirSatiri { miktar: string; fiyat: string; }
 
+type GrafikAralik = 'haftalik' | 'aylik' | '3ay' | '6ay' | 'yillik' | 'tumu';
+
+const ARALIK_LABEL: Record<GrafikAralik, string> = {
+  haftalik: 'Haftalık',
+  aylik: 'Aylık',
+  '3ay': '3 Ay',
+  '6ay': '6 Ay',
+  yillik: 'Yıllık',
+  tumu: 'Tümü',
+};
+
 function varsayilanTedarikci(data: AppData, tur: 'micir' | 'cimento'): string {
   const eslesen = data.tedarikciListesi.filter(t => t.tur === tur);
-  return eslesen.length === 1 ? String(eslesen[0].id) : '';
+  return eslesen.length >= 1 ? String(eslesen[0].id) : '';
+}
+
+// Tarih aralığı filtresi
+function aralikBaslangic(aralik: GrafikAralik): Date {
+  const now = new Date();
+  switch (aralik) {
+    case 'haftalik': { const d = new Date(now); d.setDate(d.getDate() - 7); return d; }
+    case 'aylik':    { const d = new Date(now); d.setMonth(d.getMonth() - 1); return d; }
+    case '3ay':      { const d = new Date(now); d.setMonth(d.getMonth() - 3); return d; }
+    case '6ay':      { const d = new Date(now); d.setMonth(d.getMonth() - 6); return d; }
+    case 'yillik':   { const d = new Date(now); d.setFullYear(d.getFullYear() - 1); return d; }
+    case 'tumu':     return new Date('2000-01-01');
+  }
+}
+
+// Grafik verisi: tarih → toplam miktar
+function grafikVerisi(malzemeler: Malzeme[], tur: 'micir' | 'cimento', aralik: GrafikAralik) {
+  const bas = aralikBaslangic(aralik);
+  const filtered = malzemeler
+    .filter(m => m.tur === tur && new Date(m.tarih) >= bas)
+    .sort((a, b) => a.tarih.localeCompare(b.tarih));
+
+  // Günlere göre grupla
+  const gruplar: Record<string, number> = {};
+  for (const m of filtered) {
+    gruplar[m.tarih] = (gruplar[m.tarih] || 0) + m.toplamMiktar;
+  }
+
+  // Haftalık ve üstü için hafta/ay bazında grupla
+  if (aralik === 'haftalik') {
+    return Object.entries(gruplar).map(([tarih, miktar]) => ({
+      etiket: tarih.slice(5).replace('-', '/'), // MM/DD
+      miktar,
+      tarih,
+    }));
+  }
+  if (aralik === 'aylik') {
+    // Haftalar halinde grupla
+    const haftalar: Record<string, number> = {};
+    for (const [tarih, miktar] of Object.entries(gruplar)) {
+      const d = new Date(tarih);
+      const haftaNo = Math.floor((d.getDate() - 1) / 7) + 1;
+      const key = `${tarih.slice(0, 7)}-H${haftaNo}`;
+      haftalar[key] = (haftalar[key] || 0) + miktar;
+    }
+    return Object.entries(haftalar).map(([k, miktar]) => ({
+      etiket: k.slice(5), tarih: k, miktar,
+    }));
+  }
+  // 3ay, 6ay, yillik, tumu → aylık grupla
+  const aylar: Record<string, number> = {};
+  for (const [tarih, miktar] of Object.entries(gruplar)) {
+    const ay = tarih.slice(0, 7);
+    aylar[ay] = (aylar[ay] || 0) + miktar;
+  }
+  return Object.entries(aylar).sort().map(([ay, miktar]) => ({
+    etiket: ay.slice(5) + '/' + ay.slice(2, 4), tarih: ay, miktar,
+  }));
+}
+
+// Alan grafik SVG bileşeni
+function AlanGrafik({ veriler, renk, birim }: {
+  veriler: { etiket: string; miktar: number }[];
+  renk: string;
+  birim: string;
+}) {
+  if (!veriler.length) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: 'var(--text3)', fontSize: 13 }}>
+        Bu aralıkta veri yok
+      </div>
+    );
+  }
+
+  const W = 580, H = 140, PAD_L = 52, PAD_R = 16, PAD_T = 14, PAD_B = 32;
+  const maxVal = Math.max(...veriler.map(v => v.miktar), 1);
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+
+  const pts = veriler.map((v, i) => {
+    const x = PAD_L + (veriler.length === 1 ? chartW / 2 : (i / (veriler.length - 1)) * chartW);
+    const y = PAD_T + chartH - (v.miktar / maxVal) * chartH;
+    return { x, y, ...v };
+  });
+
+  const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const areaPath = [
+    `M ${pts[0].x.toFixed(1)} ${(PAD_T + chartH).toFixed(1)}`,
+    ...pts.map(p => `L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`),
+    `L ${pts[pts.length - 1].x.toFixed(1)} ${(PAD_T + chartH).toFixed(1)}`,
+    'Z',
+  ].join(' ');
+
+  // Y eksen etiketleri
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(r => ({
+    val: maxVal * r,
+    y: PAD_T + chartH - r * chartH,
+  }));
+
+  // X eksen: max 8 etiket göster
+  const step = Math.max(1, Math.ceil(pts.length / 8));
+  const xLabels = pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
+
+  const gradId = `grad-${renk.replace('#', '')}`;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={renk} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={renk} stopOpacity="0.03" />
+        </linearGradient>
+      </defs>
+
+      {/* Grid yatay çizgiler */}
+      {yTicks.map((t, i) => (
+        <g key={i}>
+          <line x1={PAD_L} y1={t.y} x2={W - PAD_R} y2={t.y}
+            stroke="var(--border)" strokeWidth="0.5" strokeDasharray="3,3" />
+          <text x={PAD_L - 6} y={t.y + 4} textAnchor="end"
+            fontSize="9" fill="var(--text3)" fontFamily="IBM Plex Mono, monospace">
+            {t.val >= 1000 ? `${(t.val / 1000).toFixed(1)}k` : t.val.toFixed(t.val < 10 ? 1 : 0)}
+          </text>
+        </g>
+      ))}
+
+      {/* Alan */}
+      <path d={areaPath} fill={`url(#${gradId})`} />
+
+      {/* Çizgi */}
+      <path d={linePath} fill="none" stroke={renk} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+
+      {/* Nokta */}
+      {pts.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="3" fill={renk} stroke="var(--surface)" strokeWidth="1.5">
+          <title>{p.etiket}: {p.miktar.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} {birim}</title>
+        </circle>
+      ))}
+
+      {/* X etiketler */}
+      {xLabels.map((p, i) => (
+        <text key={i} x={p.x} y={H - 6} textAnchor="middle"
+          fontSize="9" fill="var(--text3)" fontFamily="IBM Plex Mono, monospace">
+          {p.etiket}
+        </text>
+      ))}
+
+      {/* Birim etiketi */}
+      <text x={PAD_L - 6} y={PAD_T - 4} textAnchor="end"
+        fontSize="8" fill="var(--text3)" fontFamily="IBM Plex Mono, monospace">
+        {birim}
+      </text>
+    </svg>
+  );
 }
 
 export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
@@ -43,16 +208,39 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
     tedId: number; tedIsim: string; tutar: number; tarih: string; aciklama: string; no: string;
   } | null>(null);
 
+  // Çoklu seçim & silme
+  const [secili, setSecili] = useState<Set<number>>(new Set());
+  const [malzemeSilOnay, setMalzemeSilOnay] = useState(false);
+
+  // Ödeme silme onay
+  const [odemeOnay, setOdemeOnay] = useState<{ acik: boolean; odemeId: number | null; bilgi: string }>({
+    acik: false, odemeId: null, bilgi: '',
+  });
+
+  // Grafik
+  const [micirAralik, setMicirAralik] = useState<GrafikAralik>('haftalik');
+  const [cimentoAralik, setCimentoAralik] = useState<GrafikAralik>('haftalik');
+
   const birimLbl = tur === 'cimento' ? 'Miktar (torba)' : 'Miktar (ton)';
   const tarife = tur === 'micir' ? data.ayarlar.micirFiyat : data.ayarlar.cimentoFiyat;
   const turTedarikci   = data.tedarikciListesi.filter(t => t.tur === tur);
   const gbTurTedarikci = data.tedarikciListesi.filter(t => t.tur === gbTur);
 
+  // Tür değişince tedarikçiyi otomatik seç
   function handleTurDegis(yeniTur: 'micir' | 'cimento') {
     setTur(yeniTur);
     setTirlar([{ miktar: '', fiyat: '' }]);
     setTedarikci(varsayilanTedarikci(data, yeniTur));
   }
+
+  // data değişince de tedarikçiyi güncelle (yeni tedarikçi eklendiyse)
+  useEffect(() => {
+    setTedarikci(prev => {
+      const mevcut = data.tedarikciListesi.find(t => String(t.id) === prev && t.tur === tur);
+      if (mevcut) return prev;
+      return varsayilanTedarikci(data, tur);
+    });
+  }, [data.tedarikciListesi, tur]);
 
   function tirEkle() { setTirlar(t => [...t, { miktar: '', fiyat: String(tarife || '') }]); }
   function tirKaldir(i: number) {
@@ -80,7 +268,25 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
     showToast('Malzeme girişi kaydedildi ✓');
   }
 
-  function malzemeSil(id: number) { onSave({ ...data, malzemeler: data.malzemeler.filter(m => m.id !== id) }); }
+  // Checkbox toggle
+  function toggleSecim(id: number) {
+    setSecili(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+  function tumunuSec(ids: number[]) {
+    setSecili(prev => prev.size === ids.length ? new Set() : new Set(ids));
+  }
+
+  // Seçili malzemeleri sil
+  function seciliSil() {
+    onSave({ ...data, malzemeler: data.malzemeler.filter(m => !secili.has(m.id)) });
+    setSecili(new Set());
+    setMalzemeSilOnay(false);
+    showToast(`${secili.size} kayıt silindi`);
+  }
 
   function tedarikciEkle() {
     if (!tedIsim.trim()) { showToast('Tedarikçi adı gerekli', false); return; }
@@ -146,15 +352,7 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
         tarih: tpTarih || today(), aciklama: tpAciklama,
       }],
     });
-    setSonOdeme({
-      tedId: tid,
-      tedIsim: tedObj?.isim || '?',
-      tutar: t,
-      tarih: tpTarih || today(),
-      aciklama: tpAciklama,
-      no: makbuzNo,
-    });
-    // borçBilgisi'ni makbuz için kullan
+    setSonOdeme({ tedId: tid, tedIsim: tedObj?.isim || '?', tutar: t, tarih: tpTarih || today(), aciklama: tpAciklama, no: makbuzNo });
     void borçBilgisi;
     setTpTutar(''); setTpAciklama(''); setTpTedarik('');
     showToast('Ödeme kaydedildi ✓');
@@ -163,9 +361,8 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
   function tedarikMakbuzAc() {
     if (!sonOdeme) return;
     const b = tedarikBorc(sonOdeme.tedId);
-    const kalanSonra = Math.max(0, b.kalan); // kalan, ödeme sonrası hesaplanmış
+    const kalanSonra = Math.max(0, b.kalan);
     const turAdi = data.tedarikciListesi.find(t => t.id === sonOdeme.tedId)?.tur;
-
     makbuzIndir({
       baslik: 'TEDARIKCI ODEME MAKBUZU',
       makbuzNo: sonOdeme.no,
@@ -185,8 +382,129 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
     });
   }
 
+  function odemeOnaySil(odemeId: number) {
+    const odeme = data.tedarikOdemeler.find(o => o.id === odemeId);
+    if (!odeme) return;
+    const ted = data.tedarikciListesi.find(t => t.id === odeme.tedarikciId);
+    setOdemeOnay({ acik: true, odemeId, bilgi: `${ted?.isim || '?'} — ${tl(odeme.tutar)} (${fd(odeme.tarih)})` });
+  }
+
+  function odemeOnaySilOnayla() {
+    if (!odemeOnay.odemeId) return;
+    onSave({ ...data, tedarikOdemeler: data.tedarikOdemeler.filter(o => o.id !== odemeOnay.odemeId) });
+    setOdemeOnay({ acik: false, odemeId: null, bilgi: '' });
+    showToast('Ödeme kaydı silindi');
+  }
+
+  // Son girişler listesi (en yeni 20)
+  const sonGirisler = [...data.malzemeler].reverse().slice(0, 20);
+  const sonIds = sonGirisler.map(m => m.id);
+
+  // Grafik verileri
+  const micirVeriler  = grafikVerisi(data.malzemeler, 'micir', micirAralik);
+  const cimentoVeriler = grafikVerisi(data.malzemeler, 'cimento', cimentoAralik);
+
   return (
     <div>
+      {/* ── Onay: Malzeme Çoklu Silme ── */}
+      {malzemeSilOnay && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '28px 32px', maxWidth: 400, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10, color: 'var(--text)' }}>Malzeme Kayıtlarını Sil</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 6 }}>
+              Seçili <strong>{secili.size}</strong> kayıt kalıcı olarak silinecek.
+            </div>
+            <div style={{ background: 'rgba(255,80,80,0.07)', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 'var(--radius)', padding: '8px 14px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, color: 'var(--danger)', marginBottom: 22 }}>
+              Bu işlem geri alınamaz.
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setMalzemeSilOnay(false)}>İptal</button>
+              <button className="btn btn-danger" onClick={seciliSil}>Evet, Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Onay: Ödeme Silme ── */}
+      {odemeOnay.acik && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '28px 32px', maxWidth: 400, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10, color: 'var(--text)' }}>Ödeme Kaydını Sil</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 6 }}>Aşağıdaki ödeme kalıcı olarak silinecek:</div>
+            <div style={{ background: 'rgba(255,80,80,0.07)', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 'var(--radius)', padding: '8px 14px', fontFamily: 'IBM Plex Mono, monospace', fontSize: 13, color: 'var(--danger)', marginBottom: 22 }}>
+              {odemeOnay.bilgi}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setOdemeOnay({ acik: false, odemeId: null, bilgi: '' })}>İptal</button>
+              <button className="btn btn-danger" onClick={odemeOnaySilOnayla}>Evet, Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ Grafikler ══ */}
+      <div className="two-col" style={{ marginBottom: 0 }}>
+        {/* Mıcır Grafiği */}
+        <div className="panel">
+          <div className="panel-header" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <div className="panel-title">📦 Mıcır Alımı</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(Object.keys(ARALIK_LABEL) as GrafikAralik[]).map(k => (
+                <button
+                  key={k}
+                  onClick={() => setMicirAralik(k)}
+                  style={{
+                    padding: '3px 9px', fontSize: 11, borderRadius: 'var(--radius)',
+                    border: '1px solid var(--border)', cursor: 'pointer',
+                    background: micirAralik === k ? 'var(--primary)' : 'var(--surface2)',
+                    color: micirAralik === k ? '#fff' : 'var(--text2)',
+                    fontWeight: micirAralik === k ? 700 : 400,
+                  }}
+                >
+                  {ARALIK_LABEL[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="panel-body" style={{ paddingTop: 8 }}>
+            <AlanGrafik veriler={micirVeriler} renk="#4f8ef7" birim="ton" />
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              Toplam: {data.malzemeler.filter(m => m.tur === 'micir' && new Date(m.tarih) >= aralikBaslangic(micirAralik)).reduce((s, m) => s + m.toplamMiktar, 0).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ton
+            </div>
+          </div>
+        </div>
+
+        {/* Çimento Grafiği */}
+        <div className="panel">
+          <div className="panel-header" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <div className="panel-title">🏗️ Çimento Alımı</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(Object.keys(ARALIK_LABEL) as GrafikAralik[]).map(k => (
+                <button
+                  key={k}
+                  onClick={() => setCimentoAralik(k)}
+                  style={{
+                    padding: '3px 9px', fontSize: 11, borderRadius: 'var(--radius)',
+                    border: '1px solid var(--border)', cursor: 'pointer',
+                    background: cimentoAralik === k ? '#e67e22' : 'var(--surface2)',
+                    color: cimentoAralik === k ? '#fff' : 'var(--text2)',
+                    fontWeight: cimentoAralik === k ? 700 : 400,
+                  }}
+                >
+                  {ARALIK_LABEL[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="panel-body" style={{ paddingTop: 8 }}>
+            <AlanGrafik veriler={cimentoVeriler} renk="#e67e22" birim="torba" />
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              Toplam: {data.malzemeler.filter(m => m.tur === 'cimento' && new Date(m.tarih) >= aralikBaslangic(cimentoAralik)).reduce((s, m) => s + m.toplamMiktar, 0).toLocaleString('tr-TR', { maximumFractionDigits: 0 })} torba
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="two-col">
         {/* ── Malzeme Girişi ── */}
         <div className="panel">
@@ -229,18 +547,53 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
           </div>
         </div>
 
-        {/* ── Son Girişler ── */}
+        {/* ── Son Girişler (checkbox + çoklu sil) ── */}
         <div className="panel">
-          <div className="panel-header"><div className="panel-title">Son Girişler</div></div>
+          <div className="panel-header">
+            <div className="panel-title">Son Girişler</div>
+            {secili.size > 0 && (
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => setMalzemeSilOnay(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+              >
+                🗑 {secili.size} Kaydı Sil
+              </button>
+            )}
+          </div>
           <div className="panel-body-0">
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Tarih</th><th>Tür</th><th>Toplam Miktar</th><th>Toplam Tutar</th><th>Tedarikçi</th><th></th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style={{ width: 32 }}>
+                      <input
+                        type="checkbox"
+                        checked={sonIds.length > 0 && secili.size === sonIds.length}
+                        onChange={() => tumunuSec(sonIds)}
+                        title="Tümünü seç"
+                      />
+                    </th>
+                    <th>Tarih</th><th>Tür</th><th>Toplam Miktar</th><th>Toplam Tutar</th><th>Tedarikçi</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {data.malzemeler.length === 0 ? (
+                  {sonGirisler.length === 0 ? (
                     <tr><td colSpan={6} className="empty">Kayıt yok</td></tr>
-                  ) : [...data.malzemeler].reverse().slice(0, 20).map(m => (
-                    <tr key={m.id} style={m.gecmisBorcMu ? { background: 'rgba(255,200,0,.04)' } : undefined}>
+                  ) : sonGirisler.map(m => (
+                    <tr
+                      key={m.id}
+                      style={{
+                        background: secili.has(m.id)
+                          ? 'rgba(255,80,80,0.07)'
+                          : m.gecmisBorcMu ? 'rgba(255,200,0,.04)' : undefined,
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => toggleSecim(m.id)}
+                    >
+                      <td onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" checked={secili.has(m.id)} onChange={() => toggleSecim(m.id)} />
+                      </td>
                       <td>{fd(m.tarih)}</td>
                       <td>
                         <span className="badge b-blue">{TURADI[m.tur] || m.tur}</span>
@@ -249,12 +602,16 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
                       <td className="td-mono">{m.toplamMiktar > 0 ? `${m.toplamMiktar.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ${m.tur === 'cimento' ? 'torba' : 'ton'}` : '—'}</td>
                       <td className="td-mono">{tl(m.toplamTutar)}</td>
                       <td>{m.tedarikci || '—'}</td>
-                      <td><button className="btn btn-danger btn-sm" onClick={() => malzemeSil(m.id)}>Sil</button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {secili.size === 0 && sonGirisler.length > 0 && (
+              <div style={{ padding: '6px 14px', fontSize: 11, color: 'var(--text3)' }}>
+                Silmek için satıra tıkla veya checkbox kullan
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -380,7 +737,6 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
               <div><label>Tarih</label><input type="date" value={tpTarih} onChange={e => setTpTarih(e.target.value)} /></div>
             </div>
             <div className="frow"><div><label>Açıklama</label><input type="text" placeholder="ör: Kasım faturası" value={tpAciklama} onChange={e => setTpAciklama(e.target.value)} /></div></div>
-
             {tpTedarik && (
               <div style={{ background: 'rgba(46,196,182,.08)', border: '1px solid rgba(46,196,182,.25)', borderRadius: 'var(--radius)', padding: '8px 14px', marginBottom: 12, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', color: 'var(--text2)' }}>
                 Kalan borç:{' '}
@@ -389,7 +745,6 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
                 </span>
               </div>
             )}
-
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn-success" onClick={tedarikOdemeKaydet}>✓ Ödeme Yap</button>
               {sonOdeme && (
@@ -398,7 +753,6 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
                 </button>
               )}
             </div>
-
             {sonOdeme && (
               <div style={{ marginTop: 10, background: 'rgba(46,196,182,.07)', border: '1px solid rgba(46,196,182,.3)', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 12, color: 'var(--text2)' }}>
                 ✓ <strong>{sonOdeme.tedIsim}</strong> — {tl(sonOdeme.tutar)} ödeme yapıldı
@@ -413,10 +767,10 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
         <div className="panel-header"><div className="panel-title">Tedarikçi Ödeme Hareketleri</div></div>
         <div className="panel-body-0">
           <table>
-            <thead><tr><th>Tarih</th><th>Tedarikçi</th><th>Tutar</th><th>Açıklama</th></tr></thead>
+            <thead><tr><th>Tarih</th><th>Tedarikçi</th><th>Tutar</th><th>Açıklama</th><th></th></tr></thead>
             <tbody>
               {data.tedarikOdemeler.length === 0 ? (
-                <tr><td colSpan={4} className="empty">Kayıt yok</td></tr>
+                <tr><td colSpan={5} className="empty">Kayıt yok</td></tr>
               ) : [...data.tedarikOdemeler].reverse().map(o => {
                 const t = data.tedarikciListesi.find(x => x.id === o.tedarikciId);
                 return (
@@ -425,6 +779,7 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
                     <td className="td-bold">{t?.isim || '?'}</td>
                     <td className="td-mono positive">{tl(o.tutar)}</td>
                     <td>{o.aciklama || '—'}</td>
+                    <td><button className="btn btn-danger btn-sm" onClick={() => odemeOnaySil(o.id)}>Sil</button></td>
                   </tr>
                 );
               })}
