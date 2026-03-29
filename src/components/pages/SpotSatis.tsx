@@ -23,15 +23,20 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
   const [odeme, setOdeme] = useState('pesin');
   const [tahsil, setTahsil] = useState('');
   const [notVal, setNotVal] = useState('');
-
-  // Kısmi/veresiye + Genel Müşteri → ad girme alanı
   const [yeniMusteriIsim, setYeniMusteriIsim] = useState('');
   const [yeniMusteriTel, setYeniMusteriTel] = useState('');
 
+  // Validasyon
+  const [errors, setErrors] = useState<{
+    musteri?: boolean; adet?: boolean; fiyat?: boolean; yeniIsim?: boolean;
+  }>({});
+
+  // Ödeme paneli
   const [opMusteri, setOpMusteri] = useState('');
   const [opTutar, setOpTutar] = useState('');
   const [opTarih, setOpTarih] = useState(today());
   const [opAciklama, setOpAciklama] = useState('');
+  const [opErrors, setOpErrors] = useState<{ musteri?: boolean; tutar?: boolean }>({});
   const [sonOdeme, setSonOdeme] = useState<{
     musteriId: number; musteriIsim: string; musteriTel: string;
     tutar: number; tarih: string; aciklama: string; no: string;
@@ -41,14 +46,12 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
   const tutar = (parseFloat(adet) || 0) * (parseFloat(fiyat) || 0);
   const tahsilTutar = odeme === 'pesin' ? tutar : odeme === 'kismi' ? (parseFloat(tahsil) || 0) : 0;
 
-  // Genel müşteri dahil liste (yalnızca giriş formu için)
   const musteriListesi: Musteri[] = [
     { id: GENEL_MUSTERI_ID, isim: GENEL_MUSTERI_ISIM },
     ...data.musteriler,
   ];
 
   const secilenGenelMi = musteriId === String(GENEL_MUSTERI_ID);
-  // Kısmi veya veresiyede genel müşteri seçildiyse ad zorunlu
   const adGirisiGerekli = secilenGenelMi && (odeme === 'kismi' || odeme === 'veresiye');
 
   function varsayilanFiyat(c: string): string {
@@ -68,6 +71,7 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
     setMusteriId(id);
     setYeniMusteriIsim('');
     setYeniMusteriTel('');
+    if (errors.musteri) setErrors(e => ({ ...e, musteri: false }));
   }
 
   function handleOdemeDegis(o: string) {
@@ -107,6 +111,7 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
   function handleOpMusteriSec(val: string) {
     setOpMusteri(val);
     setSonOdeme(null);
+    setOpErrors(e => ({ ...e, musteri: false }));
     if (val) {
       const mid = parseInt(val);
       const kalan = spotBorc(mid);
@@ -142,14 +147,19 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
   }
 
   function kaydet() {
-    if (!musteriId) { showToast('Müşteri seçin', false); return; }
-    const a = parseFloat(adet); const f = parseFloat(fiyat);
-    if (!a || !f) { showToast('Miktar ve fiyat gerekli', false); return; }
-
-    if (adGirisiGerekli && !yeniMusteriIsim.trim()) {
-      showToast('Veresiye / kısmi satış için müşteri adı girin', false);
-      return;
-    }
+    const a = parseFloat(adet);
+    const f = parseFloat(fiyat);
+    const newErrors = {
+      musteri: !musteriId,
+      adet: !a || a <= 0,
+      fiyat: !f || f <= 0,
+      yeniIsim: adGirisiGerekli && !yeniMusteriIsim.trim(),
+    };
+    setErrors(newErrors);
+    if (newErrors.musteri) { showToast('Müşteri seçin', false); return; }
+    if (newErrors.adet)    { showToast('Miktar gerekli', false); return; }
+    if (newErrors.fiyat)   { showToast('Birim fiyat gerekli', false); return; }
+    if (newErrors.yeniIsim) { showToast('Veresiye / kısmi satış için müşteri adı girin', false); return; }
 
     const makbuzNo = `SP-${Date.now().toString(36).toUpperCase().slice(-6)}`;
     let gercekMusteriId = parseInt(musteriId);
@@ -157,7 +167,6 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
     let kayitliIsim: string | undefined;
     let kayitliTel: string | undefined;
 
-    // Genel müşteri + kısmi/veresiye → otomatik müşteri oluştur
     if (adGirisiGerekli && yeniMusteriIsim.trim()) {
       const yeniM: Musteri = {
         id: uid(),
@@ -186,6 +195,7 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
 
     setAdet(''); setFiyat(varsayilanFiyat(cesit)); setTahsil(''); setNotVal('');
     setYeniMusteriIsim(''); setYeniMusteriTel('');
+    setErrors({});
 
     const ekMesaj = adGirisiGerekli ? ` · ${yeniMusteriIsim.trim()} müşteri listesine eklendi` : '';
     showToast(`Spot satış kaydedildi + makbuz açıldı ✓${ekMesaj}`);
@@ -196,8 +206,16 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
   }
 
   function odemeKaydet() {
-    const mid = parseInt(opMusteri); const t = parseFloat(opTutar);
-    if (!mid || !t) { showToast('Müşteri ve tutar gerekli', false); return; }
+    const mid = parseInt(opMusteri);
+    const t   = parseFloat(opTutar);
+    const newOpErrors = {
+      musteri: !opMusteri || isNaN(mid),
+      tutar:   !t || t <= 0,
+    };
+    setOpErrors(newOpErrors);
+    if (newOpErrors.musteri) { showToast('Müşteri seçin', false); return; }
+    if (newOpErrors.tutar)   { showToast('Geçerli tutar girin', false); return; }
+
     const eskiBorc = spotBorc(mid);
     const makbuzNo = `SS-${Date.now().toString(36).toUpperCase().slice(-6)}`;
     onSave({ ...data, spotOdemeler: [...data.spotOdemeler, { id: uid(), musteriId: mid, tutar: t, tarih: opTarih || today(), aciklama: opAciklama }] });
@@ -212,6 +230,7 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
       spotBorcOncesi: eskiBorc,
     });
     setOpTutar(''); setOpAciklama('');
+    setOpErrors({});
     showToast('Ödeme alındı ✓');
   }
 
@@ -250,7 +269,6 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
           <div className="panel-header"><div className="panel-title">Spot Satış Girişi</div></div>
           <div className="panel-body">
 
-            {/* Ödeme ÖNCE — müşteri alanını etkiliyor */}
             <div className="frow c2">
               <div>
                 <label>Ödeme</label>
@@ -263,7 +281,6 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
               <div><label>Tarih</label><input type="date" value={tarih} onChange={e => setTarih(e.target.value)} /></div>
             </div>
 
-            {/* Müşteri */}
             <div className="frow">
               <div>
                 <label>Müşteri</label>
@@ -273,19 +290,22 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
                   onChange={handleMusteriDegis}
                   placeholder="— Müşteri seç —"
                 />
+                {errors.musteri && (
+                  <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>
+                    Müşteri seçilmeli
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Peşin + Genel → bilgi notu */}
             {secilenGenelMi && odeme === 'pesin' && (
               <div style={{ background: 'rgba(246,201,14,.08)', border: '1px solid rgba(246,201,14,.3)', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>
                 📋 Peşin genel satış — borç takibi yapılmaz, kayıt tutulur.
               </div>
             )}
 
-            {/* Kısmi/Veresiye + Genel → ad giriş alanı */}
             {adGirisiGerekli && (
-              <div style={{ background: 'rgba(220,53,69,.05)', border: '1px solid rgba(220,53,69,.3)', borderRadius: 'var(--radius)', padding: '10px 12px', marginBottom: 4 }}>
+              <div style={{ background: 'rgba(220,53,69,.05)', border: `1px solid ${errors.yeniIsim ? 'var(--red)' : 'rgba(220,53,69,.3)'}`, borderRadius: 'var(--radius)', padding: '10px 12px', marginBottom: 4 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger, #c0392b)', marginBottom: 8 }}>
                   ⚠️ Veresiye / kısmi satış — müşteri adı zorunlu
                 </div>
@@ -296,10 +316,16 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
                       type="text"
                       placeholder="Ad Soyad / Firma"
                       value={yeniMusteriIsim}
-                      onChange={e => setYeniMusteriIsim(e.target.value)}
+                      onChange={e => {
+                        setYeniMusteriIsim(e.target.value);
+                        if (errors.yeniIsim) setErrors(er => ({ ...er, yeniIsim: false }));
+                      }}
                       autoFocus
-                      style={{ borderColor: !yeniMusteriIsim.trim() ? 'rgba(220,53,69,.6)' : undefined }}
+                      style={{ borderColor: errors.yeniIsim && !yeniMusteriIsim.trim() ? 'var(--red)' : undefined }}
                     />
+                    {errors.yeniIsim && !yeniMusteriIsim.trim() && (
+                      <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>Zorunlu alan</div>
+                    )}
                   </div>
                   <div>
                     <label style={{ fontSize: 11 }}>Telefon</label>
@@ -317,7 +343,6 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
               </div>
             )}
 
-            {/* Ürün */}
             <div className="frow c2">
               <div>
                 <label>Ürün Çeşidi</label>
@@ -331,7 +356,22 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
               </div>
               <div>
                 <label>Miktar ({SIP_BIRIM[cesit] || 'adet'})</label>
-                <input type="number" placeholder="0" value={adet} onChange={e => setAdet(e.target.value)} />
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="0"
+                  value={adet}
+                  onChange={e => {
+                    setAdet(e.target.value);
+                    if (errors.adet) setErrors(er => ({ ...er, adet: false }));
+                  }}
+                  style={{ borderColor: errors.adet ? 'var(--red)' : undefined }}
+                />
+                {errors.adet && (
+                  <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>
+                    Geçerli miktar girin
+                  </div>
+                )}
               </div>
             </div>
 
@@ -339,11 +379,23 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
               <div>
                 <label>Birim Fiyat (TL)</label>
                 <input
-                  type="number" step="0.01" placeholder="0.00"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="0.00"
                   value={fiyat}
-                  onChange={e => setFiyat(e.target.value)}
+                  onChange={e => {
+                    setFiyat(e.target.value);
+                    if (errors.fiyat) setErrors(er => ({ ...er, fiyat: false }));
+                  }}
+                  style={{ borderColor: errors.fiyat ? 'var(--red)' : undefined }}
                 />
-                {data.ayarlar.fp && varsayilanFiyat(cesit) && fiyat !== varsayilanFiyat(cesit) && (
+                {errors.fiyat && (
+                  <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>
+                    Geçerli fiyat girin
+                  </div>
+                )}
+                {data.ayarlar.fp && varsayilanFiyat(cesit) && fiyat !== varsayilanFiyat(cesit) && !errors.fiyat && (
                   <div style={{ fontSize: 11, color: 'var(--warning, #e67e22)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
                     ✎ Değiştirildi
                     <button style={{ fontSize: 10, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', textDecoration: 'underline' }}
@@ -358,7 +410,13 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
                 {odeme === 'kismi' ? (
                   <>
                     <label>Alınan Tutar (TL)</label>
-                    <input type="number" placeholder="0.00" value={tahsil} onChange={e => setTahsil(e.target.value)} />
+                    <input
+                      type="number"
+                      min="0.01"
+                      placeholder="0.00"
+                      value={tahsil}
+                      onChange={e => setTahsil(e.target.value)}
+                    />
                   </>
                 ) : <div />}
               </div>
@@ -397,13 +455,17 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
             <div className="frow">
               <div>
                 <label>Müşteri</label>
-                {/* Ödeme panelinde Genel Müşteri yok — sadece borç takipli gerçek müşteriler */}
                 <MusteriSecici
                   musteriler={data.musteriler}
                   value={opMusteri}
                   onChange={handleOpMusteriSec}
                   placeholder="— Müşteri seç —"
                 />
+                {opErrors.musteri && (
+                  <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>
+                    Müşteri seçilmeli
+                  </div>
+                )}
               </div>
             </div>
 
@@ -422,7 +484,25 @@ export default function SpotSatisPage({ data, onSave, showToast }: SpotSatisProp
             })()}
 
             <div className="frow c2">
-              <div><label>Tutar (TL)</label><input type="number" placeholder="0.00" value={opTutar} onChange={e => setOpTutar(e.target.value)} /></div>
+              <div>
+                <label>Tutar (TL)</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  placeholder="0.00"
+                  value={opTutar}
+                  onChange={e => {
+                    setOpTutar(e.target.value);
+                    if (opErrors.tutar) setOpErrors(er => ({ ...er, tutar: false }));
+                  }}
+                  style={{ borderColor: opErrors.tutar ? 'var(--red)' : undefined }}
+                />
+                {opErrors.tutar && (
+                  <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>
+                    Geçerli tutar girin
+                  </div>
+                )}
+              </div>
               <div><label>Tarih</label><input type="date" value={opTarih} onChange={e => setOpTarih(e.target.value)} /></div>
             </div>
             <div className="frow">

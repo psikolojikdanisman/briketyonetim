@@ -5,7 +5,6 @@ import { tl, fd, today, uid, SIP_BIRIM, SIP_CESIT_LABEL } from '@/lib/storage';
 import MusteriSecici from '@/components/MusteriSecici';
 import { makbuzYazdir } from '@/lib/makbuzYazdir';
 
-// ─── Fiyat tarifeleri → birim fiyat ──────────────────────────────────────────
 function varsayilanFiyat(cesit: string, bolge: string, data: AppData): string {
   const fp = data.ayarlar?.fp;
   if (!fp) return '';
@@ -15,7 +14,6 @@ function varsayilanFiyat(cesit: string, bolge: string, data: AppData): string {
   return val ? String(val) : '';
 }
 
-// ─── Hızlı Müşteri Ekle Modal ─────────────────────────────────────────────────
 interface HizliMusteriModalProps {
   koyler: AppData['koyler'];
   onKaydet: (m: Musteri, yeniKoy?: { isim: string; bolge: 'yakin' | 'uzak' }) => void;
@@ -29,30 +27,24 @@ function HizliMusteriModal({ koyler, onKaydet, onKapat }: HizliMusteriModalProps
   const [koySecili, setKoySecili] = useState('');
   const [showDd, setShowDd] = useState(false);
   const [yeniKoyBolge, setYeniKoyBolge] = useState<'yakin' | 'uzak' | null>(null);
+  const [isimError, setIsimError] = useState(false);
 
   const filtreKoyler = koyler.filter(k =>
     !koyAra || k.isim.toLowerCase().includes(koyAra.toLowerCase())
   );
-
   const koyListedeYok = koyAra.trim() !== '' && !koyler.find(k => k.isim.toLowerCase() === koyAra.trim().toLowerCase());
 
   function handleKoyAraChange(val: string) {
-    setKoyAra(val);
-    setKoySecili('');
-    setYeniKoyBolge(null);
-    setShowDd(true);
+    setKoyAra(val); setKoySecili(''); setYeniKoyBolge(null); setShowDd(true);
   }
 
   function kaydet() {
-    if (!isim.trim()) return;
-    const koyObj = koyler.find(k => k.isim === koySecili);
-    const bolge  = koyObj?.bolge || (koySecili && yeniKoyBolge ? yeniKoyBolge : '');
+    if (!isim.trim()) { setIsimError(true); return; }
+    const koyObj  = koyler.find(k => k.isim === koySecili);
+    const bolge   = koyObj?.bolge || (koySecili && yeniKoyBolge ? yeniKoyBolge : '');
     const koyIsim = koySecili || (koyAra.trim() && yeniKoyBolge ? koyAra.trim() : '');
     const yeniKoy = koyIsim && yeniKoyBolge ? { isim: koyIsim, bolge: yeniKoyBolge } : undefined;
-    onKaydet(
-      { id: uid(), isim: isim.trim(), tel: tel.trim(), koy: koyIsim, bolge },
-      yeniKoy
-    );
+    onKaydet({ id: uid(), isim: isim.trim(), tel: tel.trim(), koy: koyIsim, bolge }, yeniKoy);
   }
 
   return (
@@ -66,28 +58,24 @@ function HizliMusteriModal({ koyler, onKaydet, onKapat }: HizliMusteriModalProps
               type="text"
               placeholder="Ad Soyad veya Firma"
               value={isim}
-              onChange={e => setIsim(e.target.value)}
+              onChange={e => { setIsim(e.target.value); if (isimError) setIsimError(false); }}
+              style={{ borderColor: isimError ? 'var(--red)' : undefined }}
               autoFocus
             />
+            {isimError && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>Ad zorunlu</div>}
           </div>
         </div>
         <div className="frow">
           <div>
             <label>Telefon</label>
-            <input
-              type="tel"
-              placeholder="05xx..."
-              value={tel}
-              onChange={e => setTel(e.target.value)}
-            />
+            <input type="tel" placeholder="05xx..." value={tel} onChange={e => setTel(e.target.value)} />
           </div>
         </div>
         <div className="frow" style={{ position: 'relative' }}>
           <div style={{ width: '100%' }}>
             <label>Köy / Bölge</label>
             <input
-              type="text"
-              placeholder="Arayın veya yazın..."
+              type="text" placeholder="Arayın veya yazın..."
               value={koyAra}
               onChange={e => handleKoyAraChange(e.target.value)}
               onFocus={() => setShowDd(true)}
@@ -96,11 +84,9 @@ function HizliMusteriModal({ koyler, onKaydet, onKapat }: HizliMusteriModalProps
             {showDd && filtreKoyler.length > 0 && (
               <div style={{ position: 'absolute', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', zIndex: 200, maxHeight: 160, overflowY: 'auto' }}>
                 {filtreKoyler.map(k => (
-                  <div
-                    key={k.id}
+                  <div key={k.id}
                     style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--text)' }}
-                    onMouseDown={() => { setKoyAra(k.isim); setKoySecili(k.isim); setYeniKoyBolge(null); setShowDd(false); }}
-                  >
+                    onMouseDown={() => { setKoyAra(k.isim); setKoySecili(k.isim); setYeniKoyBolge(null); setShowDd(false); }}>
                     {k.isim}
                     <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>{k.bolge}</span>
                   </div>
@@ -116,22 +102,8 @@ function HizliMusteriModal({ koyler, onKaydet, onKapat }: HizliMusteriModalProps
               <strong>&ldquo;{koyAra.trim()}&rdquo;</strong> listede yok. Köy listesine eklenecek — uzaklığı nedir?
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                className={`btn btn-sm ${yeniKoyBolge === 'yakin' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ flex: 1 }}
-                onClick={() => setYeniKoyBolge('yakin')}
-              >
-                📍 Yakın Köy
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${yeniKoyBolge === 'uzak' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ flex: 1 }}
-                onClick={() => setYeniKoyBolge('uzak')}
-              >
-                🛣️ Uzak Köy
-              </button>
+              <button type="button" className={`btn btn-sm ${yeniKoyBolge === 'yakin' ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1 }} onClick={() => setYeniKoyBolge('yakin')}>📍 Yakın Köy</button>
+              <button type="button" className={`btn btn-sm ${yeniKoyBolge === 'uzak' ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1 }} onClick={() => setYeniKoyBolge('uzak')}>🛣️ Uzak Köy</button>
             </div>
             {yeniKoyBolge && (
               <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 6 }}>
@@ -146,7 +118,7 @@ function HizliMusteriModal({ koyler, onKaydet, onKapat }: HizliMusteriModalProps
           <button
             className="btn btn-primary"
             onClick={kaydet}
-            disabled={!isim.trim() || (koyListedeYok && !koySecili && !yeniKoyBolge && koyAra.trim() !== '')}
+            disabled={koyListedeYok && !koySecili && !yeniKoyBolge && koyAra.trim() !== ''}
           >
             ✓ Ekle
           </button>
@@ -156,7 +128,6 @@ function HizliMusteriModal({ koyler, onKaydet, onKapat }: HizliMusteriModalProps
   );
 }
 
-// ─── Sipariş Düzenleme Modal ───────────────────────────────────────────────────
 interface DuzenleModalProps {
   siparis: Siparis;
   onKaydet: (guncellendi: Siparis) => void;
@@ -167,21 +138,19 @@ function SiparisDuzenleModal({ siparis, onKaydet, onKapat }: DuzenleModalProps) 
   const [adet, setAdet]   = useState(String(siparis.adet));
   const [fiyat, setFiyat] = useState(String(siparis.fiyat));
   const [not, setNot]     = useState(siparis.not || '');
+  const [errors, setErrors] = useState<{ adet?: boolean; fiyat?: boolean }>({});
 
   function kaydet() {
     const yeniAdet  = parseFloat(adet);
     const yeniFiyat = parseFloat(fiyat);
-    if (!yeniAdet || yeniAdet <= 0)  return;
-    if (!yeniFiyat || yeniFiyat <= 0) return;
+    const newErrors = {
+      adet:  !yeniAdet  || yeniAdet  <= 0 || yeniAdet < siparis.gonderilen,
+      fiyat: !yeniFiyat || yeniFiyat <= 0,
+    };
+    setErrors(newErrors);
+    if (newErrors.adet || newErrors.fiyat) return;
     const yeniGonderilen = Math.min(siparis.gonderilen, yeniAdet);
-    onKaydet({
-      ...siparis,
-      adet: yeniAdet,
-      fiyat: yeniFiyat,
-      toplamTutar: yeniAdet * yeniFiyat,
-      gonderilen: yeniGonderilen,
-      not,
-    });
+    onKaydet({ ...siparis, adet: yeniAdet, fiyat: yeniFiyat, toplamTutar: yeniAdet * yeniFiyat, gonderilen: yeniGonderilen, not });
   }
 
   return (
@@ -195,28 +164,29 @@ function SiparisDuzenleModal({ siparis, onKaydet, onKapat }: DuzenleModalProps) 
         {siparis.gonderilen > 0 && (
           <div style={{ background: 'rgba(246,201,14,.1)', border: '1px solid rgba(246,201,14,.4)', borderRadius: 'var(--radius)', padding: '8px 12px', marginBottom: 12, fontSize: 12, color: 'var(--text2)' }}>
             ⚠️ Bu siparişten <strong>{siparis.gonderilen.toLocaleString('tr-TR')}</strong> adet zaten gönderildi.
-            Miktarı bunun altına düşüremezsiniz.
           </div>
         )}
         <div className="frow c2">
           <div>
             <label>Miktar ({siparis.birim || 'adet'})</label>
             <input
-              type="number"
+              type="number" min={siparis.gonderilen || 1}
               value={adet}
-              min={siparis.gonderilen || 1}
-              onChange={e => setAdet(e.target.value)}
+              onChange={e => { setAdet(e.target.value); if (errors.adet) setErrors(er => ({ ...er, adet: false })); }}
+              style={{ borderColor: errors.adet ? 'var(--red)' : undefined }}
               autoFocus
             />
+            {errors.adet && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>Geçerli miktar girin {siparis.gonderilen > 0 ? `(min: ${siparis.gonderilen})` : ''}</div>}
           </div>
           <div>
             <label>Birim Fiyat (TL)</label>
             <input
-              type="number"
-              step="0.01"
+              type="number" step="0.01" min="0.01"
               value={fiyat}
-              onChange={e => setFiyat(e.target.value)}
+              onChange={e => { setFiyat(e.target.value); if (errors.fiyat) setErrors(er => ({ ...er, fiyat: false })); }}
+              style={{ borderColor: errors.fiyat ? 'var(--red)' : undefined }}
             />
+            {errors.fiyat && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>Geçerli fiyat girin</div>}
           </div>
         </div>
         {parseFloat(adet) > 0 && parseFloat(fiyat) > 0 && (
@@ -232,24 +202,13 @@ function SiparisDuzenleModal({ siparis, onKaydet, onKapat }: DuzenleModalProps) 
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onKapat}>İptal</button>
-          <button
-            className="btn btn-primary"
-            onClick={kaydet}
-            disabled={
-              !parseFloat(adet) || parseFloat(adet) <= 0 ||
-              !parseFloat(fiyat) || parseFloat(fiyat) <= 0 ||
-              parseFloat(adet) < siparis.gonderilen
-            }
-          >
-            ✓ Kaydet
-          </button>
+          <button className="btn btn-primary" onClick={kaydet}>✓ Kaydet</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Onay Modal ───────────────────────────────────────────────────────────────
 interface OnayModalProps {
   mesaj: string;
   onOnayla: () => void;
@@ -261,9 +220,7 @@ function OnayModal({ mesaj, onOnayla, onIptal }: OnayModalProps) {
     <div className="modal-overlay open" onClick={e => { if (e.target === e.currentTarget) onIptal(); }}>
       <div className="modal" style={{ width: 380 }}>
         <div className="modal-title">Silme Onayı</div>
-        <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 20, lineHeight: 1.5 }}>
-          {mesaj}
-        </div>
+        <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 20, lineHeight: 1.5 }}>{mesaj}</div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onIptal}>İptal</button>
           <button className="btn btn-danger" onClick={onOnayla}>Sil</button>
@@ -273,7 +230,6 @@ function OnayModal({ mesaj, onOnayla, onIptal }: OnayModalProps) {
   );
 }
 
-// ─── Yardımcı fonksiyonlar ────────────────────────────────────────────────────
 interface SiparislerProps {
   data: AppData;
   onSave: (data: AppData) => void;
@@ -307,9 +263,7 @@ function gunKaydir(tarih: string, gun: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-// ─── Ana bileşen ──────────────────────────────────────────────────────────────
 export default function SiparislerPage({ data, onSave, showToast }: SiparislerProps) {
-  // Sipariş formu
   const [musteri, setMusteri]     = useState('');
   const [tarih, setTarih]         = useState(today());
   const [koyAra, setKoyAra]       = useState('');
@@ -321,12 +275,14 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
   const [oncelik, setOncelik]     = useState<'normal' | 'acil'>('normal');
   const [showHizliMusteri, setShowHizliMusteri] = useState(false);
 
-  // Düzenleme ve silme modalleri
-  const [duzenlenecek, setDuzenlenecek]   = useState<Siparis | null>(null);
-  const [silinecekId, setSilinecekId]     = useState<number | null>(null);
+  // Validasyon
+  const [sipErrors, setSipErrors] = useState<{ musteri?: boolean; urunler?: boolean }>({});
+  const [tesErrors, setTesErrors] = useState<{ musteri?: boolean; siparis?: boolean; tahsil?: boolean }>({});
+
+  const [duzenlenecek, setDuzenlenecek]     = useState<Siparis | null>(null);
+  const [silinecekId, setSilinecekId]       = useState<number | null>(null);
   const [silinecekMesaj, setSilinecekMesaj] = useState('');
 
-  // Teslimat formu
   const teslimatFormRef = useRef<HTMLDivElement>(null);
   const [tMusteri, setTMusteri]               = useState('');
   const [seciliSiparisler, setSeciliSiparisler] = useState<SeciliSiparis[]>([]);
@@ -334,12 +290,10 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
   const [tTahsil, setTTahsil]                 = useState('');
   const [tTarih, setTTarih]                   = useState(today());
 
-  // Tablo aç/kapa
   const [acikSipGruplari, setAcikSipGruplari] = useState<Set<number>>(new Set());
   const [acikTesGruplari, setAcikTesGruplari] = useState<Set<string>>(new Set());
   const [sipSiralama, setSipSiralama] = useState<'yeni' | 'eski' | null>(null);
 
-  // Teslimat filtre
   const [tesSiralama, setTesSiralama]     = useState<'yeni' | 'eski'>('yeni');
   const [tesFiltremod, setTesFiltremod]   = useState<'hepsi' | 'gun' | 'aralik'>('hepsi');
   const [tesGunTarih, setTesGunTarih]     = useState(today());
@@ -348,14 +302,11 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
   const [tesMusteriAra, setTesMusteriAra] = useState('');
   const [tesKoyAra, setTesKoyAra]         = useState('');
 
-  // Son eklenen teslimatlar (makbuz için)
   const [sonTeslimatlar, setSonTeslimatlar] = useState<Teslimat[] | null>(null);
 
-  // Yönetici bilgileri
   const yoneticiAdSoyad = [data.yonetici?.ad, data.yonetici?.soyad].filter(Boolean).join(' ');
   const yoneticiTel     = data.yonetici?.tel || '';
 
-  // ─── Sipariş formu ────────────────────────────────────────────────────────
   function urunEkle() {
     setUrunler(u => [...u, { cesit: '20lik', adet: '', fiyat: varsayilanFiyat('20lik', 'merkez', data) }]);
   }
@@ -374,12 +325,11 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
         const bolge  = koyObj?.bolge || 'merkez';
         const yeniFiyat = varsayilanFiyat(val, bolge, data);
         const eskiFiyat = varsayilanFiyat(x.cesit, bolge, data);
-        if (!x.fiyat || x.fiyat === eskiFiyat) {
-          updated.fiyat = yeniFiyat;
-        }
+        if (!x.fiyat || x.fiyat === eskiFiyat) updated.fiyat = yeniFiyat;
       }
       return updated;
     }));
+    if (sipErrors.urunler) setSipErrors(e => ({ ...e, urunler: false }));
   }
 
   function koySecildiCallback(koyIsim: string) {
@@ -389,20 +339,24 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
     setUrunler(prev => prev.map(u => {
       const yeniFiyat = varsayilanFiyat(u.cesit, bolge, data);
       const eskiFiyat = varsayilanFiyat(u.cesit, 'merkez', data);
-      if (!u.fiyat || u.fiyat === eskiFiyat) {
-        return { ...u, fiyat: yeniFiyat };
-      }
+      if (!u.fiyat || u.fiyat === eskiFiyat) return { ...u, fiyat: yeniFiyat };
       return u;
     }));
   }
 
   function siparisKaydet() {
-    if (!musteri) { showToast('Müşteri seçin', false); return; }
-    const mid     = parseInt(musteri);
-    const koyObj  = data.koyler.find(k => k.isim === koySecili);
-    const bolge   = koyObj?.bolge || '';
     const gecerli = urunler.filter(u => u.cesit && parseFloat(u.adet) > 0 && parseFloat(u.fiyat) > 0);
-    if (!gecerli.length) { showToast('En az 1 ürün ekleyin', false); return; }
+    const newErrors = {
+      musteri: !musteri,
+      urunler: gecerli.length === 0,
+    };
+    setSipErrors(newErrors);
+    if (newErrors.musteri) { showToast('Müşteri seçin', false); return; }
+    if (newErrors.urunler) { showToast('En az 1 ürün ekleyin (miktar ve fiyat zorunlu)', false); return; }
+
+    const mid    = parseInt(musteri);
+    const koyObj = data.koyler.find(k => k.isim === koySecili);
+    const bolge  = koyObj?.bolge || '';
     const yeniSiparisler: Siparis[] = gecerli.map(u => ({
       id: uid(), musteriId: mid,
       adet: parseFloat(u.adet), gonderilen: 0,
@@ -410,16 +364,15 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
       fiyat: parseFloat(u.fiyat),
       toplamTutar: parseFloat(u.adet) * parseFloat(u.fiyat),
       birim: SIP_BIRIM[u.cesit] || 'adet',
-      tarih, not: notVal,
-      oncelik,
+      tarih, not: notVal, oncelik,
     }));
     onSave({ ...data, siparisler: [...data.siparisler, ...yeniSiparisler] });
     setUrunler([{ cesit: '20lik', adet: '', fiyat: varsayilanFiyat('20lik', 'merkez', data) }]);
     setNotVal(''); setAdres(''); setKoyAra(''); setKoySecili(''); setOncelik('normal');
+    setSipErrors({});
     showToast(gecerli.length > 1 ? `${gecerli.length} sipariş eklendi ✓` : 'Sipariş eklendi ✓');
   }
 
-  // ─── Silme (onaylı) ───────────────────────────────────────────────────────
   function siparisSilOnay(s: Siparis, musteriIsim: string) {
     setSilinecekId(s.id);
     setSilinecekMesaj(
@@ -430,22 +383,16 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
   function siparisSilOnayla() {
     if (silinecekId === null) return;
     onSave({ ...data, siparisler: data.siparisler.filter(s => s.id !== silinecekId) });
-    setSilinecekId(null);
-    setSilinecekMesaj('');
+    setSilinecekId(null); setSilinecekMesaj('');
     showToast('Sipariş silindi');
   }
 
-  // ─── Düzenleme ────────────────────────────────────────────────────────────
   function siparisDuzenleKaydet(guncellendi: Siparis) {
-    onSave({
-      ...data,
-      siparisler: data.siparisler.map(s => s.id === guncellendi.id ? guncellendi : s),
-    });
+    onSave({ ...data, siparisler: data.siparisler.map(s => s.id === guncellendi.id ? guncellendi : s) });
     setDuzenlenecek(null);
     showToast('Sipariş güncellendi ✓');
   }
 
-  // ─── Hızlı müşteri ────────────────────────────────────────────────────────
   function hizliMusteriEkle(m: Musteri, yeniKoy?: { isim: string; bolge: 'yakin' | 'uzak' }) {
     const yeniKoyler = yeniKoy
       ? [...data.koyler, { id: uid(), isim: yeniKoy.isim, bolge: yeniKoy.bolge }]
@@ -458,25 +405,20 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
     showToast(`${m.isim} eklendi ✓${extra}`);
   }
 
-  // ─── Tablodan hızlı teslimat yap ─────────────────────────────────────────
   function hizliTeslimatYap(musteriId: number) {
-    const acikSiparisler = data.siparisler.filter(
-      s => s.musteriId === musteriId && s.gonderilen < s.adet
-    );
+    const acikSiparisler = data.siparisler.filter(s => s.musteriId === musteriId && s.gonderilen < s.adet);
     setTMusteri(String(musteriId));
-    setSeciliSiparisler(
-      acikSiparisler.map(s => ({ siparisId: s.id, adet: String(s.adet - s.gonderilen) }))
-    );
+    setSeciliSiparisler(acikSiparisler.map(s => ({ siparisId: s.id, adet: String(s.adet - s.gonderilen) })));
     setTTahsil('');
-    setTimeout(() => {
-      teslimatFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
+    setTesErrors({});
+    setTimeout(() => { teslimatFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
   }
 
   function handleTMusteriSec(val: string) {
     setTMusteri(val);
     setSeciliSiparisler([]);
     setTTahsil('');
+    setTesErrors(e => ({ ...e, musteri: false }));
   }
 
   const tMusteriAcikSiparisler = tMusteri
@@ -491,6 +433,7 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
       const kalan = sip ? sip.adet - sip.gonderilen : 0;
       return [...prev, { siparisId: sipId, adet: String(kalan) }];
     });
+    if (tesErrors.siparis) setTesErrors(e => ({ ...e, siparis: false }));
   }
 
   function seciliAdetGuncelle(sipId: number, val: string) {
@@ -504,8 +447,15 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
   }, 0);
 
   function teslimatKaydet() {
-    if (!tMusteri) { showToast('Müşteri seçin', false); return; }
-    if (!seciliSiparisler.length) { showToast('En az 1 sipariş seçin', false); return; }
+    const newErrors = {
+      musteri: !tMusteri,
+      siparis: seciliSiparisler.length === 0,
+      tahsil:  tOdeme === 'kismi' && (!parseFloat(tTahsil) || parseFloat(tTahsil) <= 0),
+    };
+    setTesErrors(newErrors);
+    if (newErrors.musteri) { showToast('Müşteri seçin', false); return; }
+    if (newErrors.siparis) { showToast('En az 1 sipariş seçin', false); return; }
+
     for (const ss of seciliSiparisler) {
       const sip = data.siparisler.find(s => s.id === ss.siparisId);
       if (!sip) continue;
@@ -513,6 +463,9 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
       if (!adet || adet <= 0) { showToast(`${SIP_CESIT_LABEL[sip.cesit] || sip.cesit} için geçerli adet girin`, false); return; }
       if (adet > sip.adet - sip.gonderilen) { showToast(`${SIP_CESIT_LABEL[sip.cesit] || sip.cesit}: en fazla ${sip.adet - sip.gonderilen} gönderilebilir`, false); return; }
     }
+
+    if (newErrors.tahsil) { showToast('Kısmi ödeme tutarı gerekli', false); return; }
+
     const yeniTeslimatlar: Teslimat[] = seciliSiparisler.map(ss => {
       const sip = data.siparisler.find(s => s.id === ss.siparisId)!;
       const adet = parseFloat(ss.adet);
@@ -535,17 +488,11 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
     onSave({ ...data, siparisler: yeniSiparisler, teslimatlar: [...data.teslimatlar, ...yeniTeslimatlar] });
 
     const m = data.musteriler.find(x => x.id === parseInt(tMusteri));
-    makbuzYazdir({
-      musteriIsim: m?.isim || '?',
-      kalemler: yeniTeslimatlar,
-      tarih: tTarih || today(),
-      yoneticiAdSoyad,
-      yoneticiTel,
-    });
+    makbuzYazdir({ musteriIsim: m?.isim || '?', kalemler: yeniTeslimatlar, tarih: tTarih || today(), yoneticiAdSoyad, yoneticiTel });
 
-    setSeciliSiparisler([]);
-    setTTahsil('');
+    setSeciliSiparisler([]); setTTahsil('');
     setSonTeslimatlar(yeniTeslimatlar);
+    setTesErrors({});
     showToast(`${yeniTeslimatlar.length} kalem teslimat eklendi ✓`);
   }
 
@@ -594,23 +541,13 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
     }
     if (tesMusteriAra.trim()) {
       const ara = tesMusteriAra.trim().toLowerCase();
-      list = list.filter(t => {
-        const m = data.musteriler.find(x => x.id === t.musteriId);
-        return m?.isim.toLowerCase().includes(ara);
-      });
+      list = list.filter(t => { const m = data.musteriler.find(x => x.id === t.musteriId); return m?.isim.toLowerCase().includes(ara); });
     }
     if (tesKoyAra.trim()) {
       const ara = tesKoyAra.trim().toLowerCase();
-      list = list.filter(t =>
-        (t.koy || '').toLowerCase().includes(ara) ||
-        (t.adres || '').toLowerCase().includes(ara) ||
-        (t.bolge || '').toLowerCase().includes(ara)
-      );
+      list = list.filter(t => (t.koy || '').toLowerCase().includes(ara) || (t.adres || '').toLowerCase().includes(ara) || (t.bolge || '').toLowerCase().includes(ara));
     }
-    list.sort((a, b) => tesSiralama === 'yeni'
-      ? b.tarih.localeCompare(a.tarih) || b.id - a.id
-      : a.tarih.localeCompare(b.tarih) || a.id - b.id
-    );
+    list.sort((a, b) => tesSiralama === 'yeni' ? b.tarih.localeCompare(a.tarih) || b.id - a.id : a.tarih.localeCompare(b.tarih) || a.id - b.id);
     return list;
   }, [data.teslimatlar, data.musteriler, tesFiltremod, tesGunTarih, tesBaslangic, tesBitis, tesSiralama, tesMusteriAra, tesKoyAra]);
 
@@ -648,38 +585,22 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
     return { cls: 'b-red', label: 'Borçlu' };
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div>
-      {/* Modaller */}
       {showHizliMusteri && (
-        <HizliMusteriModal
-          koyler={data.koyler}
-          onKaydet={(m, yeniKoy) => hizliMusteriEkle(m, yeniKoy)}
-          onKapat={() => setShowHizliMusteri(false)}
-        />
+        <HizliMusteriModal koyler={data.koyler} onKaydet={(m, yeniKoy) => hizliMusteriEkle(m, yeniKoy)} onKapat={() => setShowHizliMusteri(false)} />
       )}
       {duzenlenecek && (
-        <SiparisDuzenleModal
-          siparis={duzenlenecek}
-          onKaydet={siparisDuzenleKaydet}
-          onKapat={() => setDuzenlenecek(null)}
-        />
+        <SiparisDuzenleModal siparis={duzenlenecek} onKaydet={siparisDuzenleKaydet} onKapat={() => setDuzenlenecek(null)} />
       )}
       {silinecekId !== null && (
-        <OnayModal
-          mesaj={silinecekMesaj}
-          onOnayla={siparisSilOnayla}
-          onIptal={() => { setSilinecekId(null); setSilinecekMesaj(''); }}
-        />
+        <OnayModal mesaj={silinecekMesaj} onOnayla={siparisSilOnayla} onIptal={() => { setSilinecekId(null); setSilinecekMesaj(''); }} />
       )}
 
       <div className="two-col">
         {/* ── Sipariş formu ── */}
         <div className="panel">
-          <div className="panel-header">
-            <div className="panel-title">Yeni Sipariş</div>
-          </div>
+          <div className="panel-header"><div className="panel-title">Yeni Sipariş</div></div>
           <div className="panel-body">
             <div className="frow c2">
               <div>
@@ -689,19 +610,13 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                     <MusteriSecici
                       musteriler={data.musteriler}
                       value={musteri}
-                      onChange={setMusteri}
+                      onChange={v => { setMusteri(v); if (sipErrors.musteri) setSipErrors(e => ({ ...e, musteri: false })); }}
                       placeholder="— Müşteri seç —"
                     />
                   </div>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setShowHizliMusteri(true)}
-                    title="Yeni müşteri ekle"
-                    style={{ padding: '8px 10px', flexShrink: 0 }}
-                  >
-                    + Yeni
-                  </button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setShowHizliMusteri(true)} title="Yeni müşteri ekle" style={{ padding: '8px 10px', flexShrink: 0 }}>+ Yeni</button>
                 </div>
+                {sipErrors.musteri && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>Müşteri seçilmeli</div>}
               </div>
               <div>
                 <label>Tarih</label>
@@ -743,6 +658,11 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
 
             <div style={{ marginBottom: 8 }}>
               <label style={{ marginBottom: 8, display: 'block' }}>Ürünler</label>
+              {sipErrors.urunler && (
+                <div style={{ color: 'var(--red)', fontSize: 11, marginBottom: 6 }}>
+                  En az 1 ürün için miktar ve fiyat girilmeli
+                </div>
+              )}
               {urunler.map((u, i) => (
                 <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 8, alignItems: 'end', marginBottom: 8 }}>
                   <div>
@@ -761,15 +681,20 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                   </div>
                   <div>
                     {i === 0 && <label>Miktar</label>}
-                    <input type="number" placeholder="0" value={u.adet} onChange={e => urunGuncelle(i, 'adet', e.target.value)} />
+                    <input
+                      type="number" min="1" placeholder="0"
+                      value={u.adet}
+                      onChange={e => urunGuncelle(i, 'adet', e.target.value)}
+                      style={{ borderColor: sipErrors.urunler && !parseFloat(u.adet) ? 'var(--red)' : undefined }}
+                    />
                   </div>
                   <div>
                     {i === 0 && <label>Birim Fiyat</label>}
                     <input
-                      type="number" step="0.01"
-                      placeholder="0.00"
+                      type="number" step="0.01" min="0.01" placeholder="0.00"
                       value={u.fiyat}
                       onChange={e => urunGuncelle(i, 'fiyat', e.target.value)}
+                      style={{ borderColor: sipErrors.urunler && !parseFloat(u.fiyat) ? 'var(--red)' : undefined }}
                     />
                   </div>
                   <div style={{ paddingBottom: 1 }}>
@@ -789,13 +714,9 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                 <label>Öncelik</label>
                 <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
                   {(['normal', 'acil'] as const).map(p => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setOncelik(p)}
+                    <button key={p} type="button" onClick={() => setOncelik(p)}
                       className={`btn btn-sm ${oncelik === p ? (p === 'acil' ? 'btn-danger' : 'btn-primary') : 'btn-secondary'}`}
-                      style={{ flex: 1, fontWeight: oncelik === p ? 700 : 400 }}
-                    >
+                      style={{ flex: 1, fontWeight: oncelik === p ? 700 : 400 }}>
                       {p === 'acil' ? '🔴 Acil' : '🟢 Normal'}
                     </button>
                   ))}
@@ -820,6 +741,7 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                   })}
                   value={tMusteri} onChange={handleTMusteriSec} placeholder="— Müşteri seç —"
                 />
+                {tesErrors.musteri && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>Müşteri seçilmeli</div>}
               </div>
             </div>
 
@@ -831,6 +753,7 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
               <>
                 <div style={{ marginBottom: 12 }}>
                   <label style={{ marginBottom: 8, display: 'block' }}>Teslim Edilecek Siparişler</label>
+                  {tesErrors.siparis && <div style={{ color: 'var(--red)', fontSize: 11, marginBottom: 6 }}>En az 1 sipariş seçilmeli</div>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {tMusteriAcikSiparisler.map(sip => {
                       const secili = seciliSiparisler.find(s => s.siparisId === sip.id);
@@ -849,7 +772,11 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, paddingLeft: 26 }}>
                               <div>
                                 <label style={{ fontSize: 11 }}>Bu Sefer Gönderilecek</label>
-                                <input type="number" placeholder={`max ${kalan}`} value={secili.adet} onChange={e => seciliAdetGuncelle(sip.id, e.target.value)} />
+                                <input
+                                  type="number" min="1" placeholder={`max ${kalan}`}
+                                  value={secili.adet}
+                                  onChange={e => seciliAdetGuncelle(sip.id, e.target.value)}
+                                />
                               </div>
                               <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
                                 <span style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>= {tl((parseFloat(secili.adet) || 0) * sip.fiyat)}</span>
@@ -874,7 +801,7 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                       </div>
                       <div>
                         <label>Ödeme Durumu</label>
-                        <select value={tOdeme} onChange={e => setTOdeme(e.target.value)}>
+                        <select value={tOdeme} onChange={e => { setTOdeme(e.target.value); if (tesErrors.tahsil) setTesErrors(er => ({ ...er, tahsil: false })); }}>
                           <option value="pesin">Peşin</option>
                           <option value="kismi">Kısmi</option>
                           <option value="veresiye">Veresiye</option>
@@ -885,7 +812,13 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                       <div className="frow">
                         <div>
                           <label>Alınan Tutar (TL)</label>
-                          <input type="number" placeholder="0.00" value={tTahsil} onChange={e => setTTahsil(e.target.value)} />
+                          <input
+                            type="number" min="0.01" placeholder="0.00"
+                            value={tTahsil}
+                            onChange={e => { setTTahsil(e.target.value); if (tesErrors.tahsil) setTesErrors(er => ({ ...er, tahsil: false })); }}
+                            style={{ borderColor: tesErrors.tahsil ? 'var(--red)' : undefined }}
+                          />
+                          {tesErrors.tahsil && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>Kısmi ödeme tutarı gerekli</div>}
                         </div>
                       </div>
                     )}
@@ -910,25 +843,17 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
       <div className="panel">
         <div className="panel-header">
           <div className="panel-title">Siparişler</div>
-          <span style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace' }}>
-            {toplamAcikKalem} açık kalem
-          </span>
+          <span style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace' }}>{toplamAcikKalem} açık kalem</span>
         </div>
         <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 4 }}>
             {(['yeni', 'eski'] as const).map(s => (
-              <button
-                key={s}
-                className={`btn btn-sm ${sipSiralama === s ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setSipSiralama(prev => prev === s ? null : s)}
-              >
+              <button key={s} className={`btn btn-sm ${sipSiralama === s ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSipSiralama(prev => prev === s ? null : s)}>
                 {s === 'yeni' ? '↓ En Yeni' : '↑ En Eski'}
               </button>
             ))}
           </div>
-          <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace', marginLeft: 'auto' }}>
-            {sipGruplari.length} müşteri
-          </span>
+          <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace', marginLeft: 'auto' }}>{sipGruplari.length} müşteri</span>
         </div>
         <div className="panel-body-0">
           <div className="table-wrap">
@@ -936,13 +861,8 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
               <thead>
                 <tr>
                   <th style={{ width: 28 }}></th>
-                  <th>Tarih</th>
-                  <th>Müşteri</th>
-                  <th>Yer</th>
-                  <th>Ana Ürün</th>
-                  <th>Toplam Tutar</th>
-                  <th>İlerleme</th>
-                  <th>Durum</th>
+                  <th>Tarih</th><th>Müşteri</th><th>Yer</th><th>Ana Ürün</th>
+                  <th>Toplam Tutar</th><th>İlerleme</th><th>Durum</th>
                   <th style={{ width: 140 }}>İşlemler</th>
                 </tr>
               </thead>
@@ -964,53 +884,25 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                   const sonTarih = acikKalemler.reduce((en, s) => s.tarih > en ? s.tarih : en, acikKalemler[0].tarih);
 
                   const rows = [
-                    <tr
-                      key={`g-${musteriId}`}
-                      onClick={() => cokKalem && toggleSipGrup(musteriId)}
-                      style={{ cursor: cokKalem ? 'pointer' : 'default', background: isAcil ? 'rgba(220,50,50,.06)' : acik ? 'rgba(45,122,79,.04)' : undefined }}
-                    >
-                      <td style={{ textAlign: 'center', fontSize: 12, color: 'var(--accent)', userSelect: 'none' }}>
-                        {cokKalem ? (acik ? '▾' : '▸') : ''}
-                      </td>
+                    <tr key={`g-${musteriId}`} onClick={() => cokKalem && toggleSipGrup(musteriId)}
+                      style={{ cursor: cokKalem ? 'pointer' : 'default', background: isAcil ? 'rgba(220,50,50,.06)' : acik ? 'rgba(45,122,79,.04)' : undefined }}>
+                      <td style={{ textAlign: 'center', fontSize: 12, color: 'var(--accent)', userSelect: 'none' }}>{cokKalem ? (acik ? '▾' : '▸') : ''}</td>
                       <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{fd(sonTarih)}</td>
-                      <td className="td-bold">
-                        {m?.isim || '?'}
-                        {isAcil && <span className="badge b-red" style={{ marginLeft: 6, fontSize: 10 }}>🔴 ACİL</span>}
-                      </td>
+                      <td className="td-bold">{m?.isim || '?'}{isAcil && <span className="badge b-red" style={{ marginLeft: 6, fontSize: 10 }}>🔴 ACİL</span>}</td>
                       <td style={{ fontSize: 12, color: 'var(--text2)', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {yerOzet !== '—' ? <span title={yerler.join(', ')}>📍 {yerOzet}</span> : <span style={{ color: 'var(--text3)' }}>—</span>}
                       </td>
-                      <td>
-                        <span className="badge b-yellow">{anaUrun(acikKalemler)}</span>
-                        {cokKalem && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>+{acikKalemler.length - 1} kalem</span>}
-                      </td>
+                      <td><span className="badge b-yellow">{anaUrun(acikKalemler)}</span>{cokKalem && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>+{acikKalemler.length - 1} kalem</span>}</td>
                       <td className="td-mono">{tl(topTutar)}</td>
                       <td className="td-mono" style={{ fontSize: 12 }}>{topGond.toLocaleString('tr-TR')} / {topAdet.toLocaleString('tr-TR')}</td>
                       <td><span className={`badge ${badge.cls}`}>{badge.label}</span></td>
                       <td>
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          <button
-                            className="btn btn-success btn-sm"
-                            onClick={e => { e.stopPropagation(); hizliTeslimatYap(musteriId); }}
-                          >
-                            🚛 Teslimat
-                          </button>
+                          <button className="btn btn-success btn-sm" onClick={e => { e.stopPropagation(); hizliTeslimatYap(musteriId); }}>🚛 Teslimat</button>
                           {!cokKalem && (
                             <>
-                              <button
-                                className="btn btn-secondary btn-sm"
-                                onClick={e => { e.stopPropagation(); setDuzenlenecek(acikKalemler[0]); }}
-                                title="Düzenle"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                className="btn btn-danger btn-sm"
-                                onClick={e => { e.stopPropagation(); siparisSilOnay(acikKalemler[0], m?.isim || '?'); }}
-                                title="Sil"
-                              >
-                                🗑️
-                              </button>
+                              <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); setDuzenlenecek(acikKalemler[0]); }} title="Düzenle">✏️</button>
+                              <button className="btn btn-danger btn-sm" onClick={e => { e.stopPropagation(); siparisSilOnay(acikKalemler[0], m?.isim || '?'); }} title="Sil">🗑️</button>
                             </>
                           )}
                         </div>
@@ -1034,32 +926,17 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                           <td><span className="badge b-yellow">{SIP_CESIT_LABEL[s.cesit] || s.cesit}</span></td>
                           <td className="td-mono">{tl(s.toplamTutar)}</td>
                           <td className="td-mono" style={{ fontSize: 12 }}>{s.gonderilen.toLocaleString('tr-TR')} / {s.adet.toLocaleString('tr-TR')}</td>
-                          <td>
-                            <span className={`badge ${sBadge}`}>{sLabel}</span>
-                          </td>
+                          <td><span className={`badge ${sBadge}`}>{sLabel}</span></td>
                           <td>
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button
-                                className="btn btn-secondary btn-sm"
-                                onClick={e => { e.stopPropagation(); setDuzenlenecek(s); }}
-                                title="Düzenle"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                className="btn btn-danger btn-sm"
-                                onClick={e => { e.stopPropagation(); siparisSilOnay(s, m?.isim || '?'); }}
-                                title="Sil"
-                              >
-                                🗑️
-                              </button>
+                              <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); setDuzenlenecek(s); }} title="Düzenle">✏️</button>
+                              <button className="btn btn-danger btn-sm" onClick={e => { e.stopPropagation(); siparisSilOnay(s, m?.isim || '?'); }} title="Sil">🗑️</button>
                             </div>
                           </td>
                         </tr>
                       );
                     });
                   }
-
                   return rows;
                 })}
               </tbody>
@@ -1075,34 +952,23 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: 4 }}>
               {(['yeni','eski'] as const).map(s => (
-                <button
-                  key={s}
-                  className={`btn btn-sm ${tesSiralama === s ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setTesSiralama(prev => prev === s ? 'yeni' : s)}
-                >
+                <button key={s} className={`btn btn-sm ${tesSiralama === s ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTesSiralama(prev => prev === s ? 'yeni' : s)}>
                   {s === 'yeni' ? '↓ En Yeni' : '↑ En Eski'}
                 </button>
               ))}
             </div>
             <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 2px' }} />
-            <button
-              className={`btn btn-sm ${tesFiltremod === 'hepsi' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setTesFiltremod('hepsi')}
-            >Tümü</button>
+            <button className={`btn btn-sm ${tesFiltremod === 'hepsi' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTesFiltremod('hepsi')}>Tümü</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button className="btn btn-sm btn-secondary" onClick={() => { setTesGunTarih(prev => gunKaydir(prev, -1)); setTesFiltremod('gun'); }} style={{ padding: '4px 10px', fontWeight: 700 }}>‹</button>
               <div
                 style={{ padding: '4px 12px', background: tesFiltremod === 'gun' ? 'rgba(45,122,79,.12)' : 'var(--surface)', border: `1px solid ${tesFiltremod === 'gun' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)', fontSize: 13, fontFamily: 'JetBrains Mono, monospace', minWidth: 100, textAlign: 'center', color: tesGunTarih === today() ? 'var(--accent)' : 'var(--text)', fontWeight: tesGunTarih === today() ? 700 : 400, cursor: 'pointer' }}
-                onClick={() => { setTesGunTarih(today()); setTesFiltremod('gun'); }}
-              >
+                onClick={() => { setTesGunTarih(today()); setTesFiltremod('gun'); }}>
                 {tesFiltremod === 'gun' ? (tesGunTarih === today() ? 'Bugün' : fd(tesGunTarih)) : 'Bugün'}
               </div>
               <button className="btn btn-sm btn-secondary" onClick={() => { setTesGunTarih(prev => gunKaydir(prev, +1)); setTesFiltremod('gun'); }} style={{ padding: '4px 10px', fontWeight: 700 }}>›</button>
             </div>
-            <button
-              className={`btn btn-sm ${tesFiltremod === 'aralik' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setTesFiltremod(prev => prev === 'aralik' ? 'hepsi' : 'aralik')}
-            >Aralık</button>
+            <button className={`btn btn-sm ${tesFiltremod === 'aralik' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTesFiltremod(prev => prev === 'aralik' ? 'hepsi' : 'aralik')}>Aralık</button>
             {tesFiltremod === 'aralik' && (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input type="date" value={tesBaslangic} onChange={e => setTesBaslangic(e.target.value)} style={{ padding: '4px 8px', fontSize: 13, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }} />
@@ -1197,7 +1063,6 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
         </div>
       </div>
 
-      {/* Sonuncu teslimat makbuz tekrar butonu */}
       {sonTeslimatlar && (
         <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
           <button className="btn btn-secondary btn-sm"

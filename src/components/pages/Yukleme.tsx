@@ -48,9 +48,11 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
   const [yukNot, setYukNot] = useState('');
   const [yukIsciler, setYukIsciler] = useState<number[]>([]);
   const [noktalar, setNoktalar] = useState<IndirmeNokta[]>([yeniNokta()]);
-
-  // Tabloda hangi yükleme satırı açık
   const [acikYukleme, setAcikYukleme] = useState<number | null>(null);
+
+  // Validasyon hataları
+  const [yukErrors, setYukErrors] = useState<{ miktar?: boolean; isciler?: boolean }>({});
+  const [noktaErrors, setNoktaErrors] = useState<Record<number, { miktar?: boolean; isciler?: boolean }>>({});
 
   const a = data.ayarlar;
   const ucretYukleme  = a.ucretYukleme  || 0;
@@ -74,6 +76,7 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
 
   function toggleYuk(id: number) {
     setYukIsciler(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+    if (yukErrors.isciler) setYukErrors(e => ({ ...e, isciler: false }));
   }
 
   function toggleNoktaIsci(nid: number, isciId: number) {
@@ -85,26 +88,32 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
           : [...n.isciler, isciId],
       }
     ));
+    setNoktaErrors(prev => ({ ...prev, [nid]: { ...prev[nid], isciler: false } }));
   }
 
   function noktaGuncelle<K extends keyof IndirmeNokta>(nid: number, key: K, val: IndirmeNokta[K]) {
     setNoktalar(prev => prev.map(n => n.id !== nid ? n : { ...n, [key]: val }));
+    if (key === 'miktar') setNoktaErrors(prev => ({ ...prev, [nid]: { ...prev[nid], miktar: false } }));
   }
 
   function noktaEkle() {
-    // Yeni nokta yükleme işçileriyle başlar
     setNoktalar(prev => [...prev, yeniNokta([...yukIsciler], yukMiktar)]);
   }
 
   function noktaSil(nid: number) {
     if (noktalar.length <= 1) { showToast('En az 1 indirme noktası olmalı', false); return; }
     setNoktalar(prev => prev.filter(n => n.id !== nid));
+    setNoktaErrors(prev => { const next = { ...prev }; delete next[nid]; return next; });
   }
 
   function adim1Ileri() {
-    if (!yukM || yukM <= 0)      { showToast('Miktar gerekli', false); return; }
-    if (yukIsciler.length === 0) { showToast('En az 1 yükleme işçisi seçin', false); return; }
-    // İlk noktaya yükleme miktarı + işçilerini varsayılan olarak doldur
+    const newErrors = {
+      miktar: !yukM || yukM <= 0,
+      isciler: yukIsciler.length === 0,
+    };
+    setYukErrors(newErrors);
+    if (newErrors.miktar) { showToast('Miktar gerekli', false); return; }
+    if (newErrors.isciler) { showToast('En az 1 yükleme işçisi seçin', false); return; }
     setNoktalar(prev => prev.map((n, i) =>
       i === 0 ? { ...n, miktar: yukMiktar, isciler: [...yukIsciler] } : n
     ));
@@ -112,8 +121,13 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
   }
 
   function sadecYuklemeKaydet() {
-    if (!yukM || yukM <= 0)      { showToast('Miktar gerekli', false); return; }
-    if (yukIsciler.length === 0) { showToast('En az 1 işçi seçin', false); return; }
+    const newErrors = {
+      miktar: !yukM || yukM <= 0,
+      isciler: yukIsciler.length === 0,
+    };
+    setYukErrors(newErrors);
+    if (newErrors.miktar) { showToast('Miktar gerekli', false); return; }
+    if (newErrors.isciler) { showToast('En az 1 işçi seçin', false); return; }
     const kayit: Yukleme = {
       id: uid(), tarih, tur: 'yukleme', miktar: yukM,
       isciler: yukIsciler, kisiBasiUcret: yukKisiBasiUcret,
@@ -125,14 +139,20 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
   }
 
   function kaydet() {
+    const newNoktaErrors: Record<number, { miktar?: boolean; isciler?: boolean }> = {};
+    let hasError = false;
     for (let i = 0; i < noktalar.length; i++) {
       const n = noktalar[i];
-      if (!parseFloat(n.miktar) || parseFloat(n.miktar) <= 0) {
-        showToast(`${i + 1}. nokta: miktar gerekli`, false); return;
-      }
-      if (n.isciler.length === 0) {
-        showToast(`${i + 1}. nokta: en az 1 işçi seçin`, false); return;
-      }
+      const m = parseFloat(n.miktar);
+      const err: { miktar?: boolean; isciler?: boolean } = {};
+      if (!m || m <= 0) { err.miktar = true; hasError = true; }
+      if (n.isciler.length === 0) { err.isciler = true; hasError = true; }
+      if (Object.keys(err).length) newNoktaErrors[n.id] = err;
+    }
+    setNoktaErrors(newNoktaErrors);
+    if (hasError) {
+      showToast('Tüm indirme noktalarını doldurun', false);
+      return;
     }
 
     const yukId = uid();
@@ -152,7 +172,6 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
         kisiBasiUcret: h.kbp,
         toplamUcret: h.top,
         not: n.not || yukNot,
-        // ilişki için yükleme id'sini not'a göm
         yuklemeId: yukId,
       } as Yukleme & { yuklemeId: number };
     });
@@ -167,15 +186,11 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
     setYukMiktar(''); setYukNot('');
     setYukIsciler([]);
     setNoktalar([yeniNokta()]);
+    setYukErrors({});
+    setNoktaErrors({});
   }
 
   function silYukleme(yukId: number) {
-    // Yüklemeyi ve ilişkili tüm indirmeleri sil
-    const yuk = data.yuklemeler.find(y => y.id === yukId);
-    if (!yuk) return;
-    // Aynı tarih + aynı not + tur !== 'yukleme' olan kayıtları da sil
-    // Daha güvenli: yuklemeler içinde bu yüklemenin hemen ardından gelen
-    // indirme kayıtlarını bul (yuklemeid field'ı varsa kullan)
     const filtered = data.yuklemeler.filter(y => {
       if (y.id === yukId) return false;
       const asExt = y as Yukleme & { yuklemeId?: number };
@@ -192,7 +207,6 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
     : adim === 'indirme' && hedef === 'yukleme' ? 'var(--green)'
     : 'var(--text3)';
 
-  // Tabloyu grupla: sadece yükleme satırları + her birinin indirmeleri
   const sadecYuklemeler = [...data.yuklemeler]
     .filter(y => y.tur === 'yukleme')
     .sort((a, b) => b.tarih.localeCompare(a.tarih));
@@ -207,7 +221,6 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
 
   return (
     <div>
-      {/* ═══ FORM ═══ */}
       <div className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-header">
           <div className="panel-title">
@@ -236,8 +249,22 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                 </div>
                 <div>
                   <label>Miktar (adet)</label>
-                  <input type="number" placeholder="ör: 5000" value={yukMiktar}
-                    onChange={e => setYukMiktar(e.target.value)} />
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="ör: 5000"
+                    value={yukMiktar}
+                    onChange={e => {
+                      setYukMiktar(e.target.value);
+                      if (yukErrors.miktar) setYukErrors(er => ({ ...er, miktar: false }));
+                    }}
+                    style={{ borderColor: yukErrors.miktar ? 'var(--red)' : undefined }}
+                  />
+                  {yukErrors.miktar && (
+                    <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>
+                      Geçerli bir miktar girin (0&apos;dan büyük)
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -250,7 +277,15 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                       ? <strong style={{ color: 'var(--accent)' }}>{ucretYukleme.toFixed(3)} TL/adet</strong>
                       : <span style={{ color: 'var(--red)' }}>Ayarlar sayfasından girin</span>}
                   </div>
-                  <div className="check-list">
+                  {yukErrors.isciler && (
+                    <div style={{ color: 'var(--red)', fontSize: 11, marginBottom: 4 }}>
+                      En az 1 işçi seçilmeli
+                    </div>
+                  )}
+                  <div
+                    className="check-list"
+                    style={{ borderColor: yukErrors.isciler ? 'var(--red)' : undefined, borderWidth: yukErrors.isciler ? 1 : undefined, borderStyle: yukErrors.isciler ? 'solid' : undefined, borderRadius: yukErrors.isciler ? 'var(--radius)' : undefined, padding: yukErrors.isciler ? 6 : undefined }}
+                  >
                     {data.isciler.length === 0
                       ? <span style={{ color: 'var(--text3)', fontSize: 12 }}>Önce işçi ekleyin</span>
                       : data.isciler.map(i => (
@@ -297,7 +332,6 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
           {/* ── ADIM 2: İNDİRME ── */}
           {adim === 'indirme' && (
             <>
-              {/* Yükleme özeti */}
               <div style={{
                 background: 'rgba(46,196,182,.06)',
                 border: '1px solid rgba(46,196,182,.2)',
@@ -315,13 +349,13 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                 </span>
               </div>
 
-              {/* İndirme noktaları */}
               {noktalar.map((n, idx) => {
                 const h = noktaHesap(n);
                 const nm = parseFloat(n.miktar) || 0;
+                const nErr = noktaErrors[n.id] || {};
                 return (
                   <div key={n.id} style={{
-                    border: '1px solid var(--border)',
+                    border: `1px solid ${(nErr.miktar || nErr.isciler) ? 'var(--red)' : 'var(--border)'}`,
                     borderRadius: 'var(--radius)',
                     padding: '14px 16px',
                     marginBottom: 12,
@@ -339,9 +373,19 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                     <div className="frow c2" style={{ marginBottom: 10 }}>
                       <div>
                         <label>Miktar (adet)</label>
-                        <input type="number" placeholder="ör: 800"
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="ör: 800"
                           value={n.miktar}
-                          onChange={e => noktaGuncelle(n.id, 'miktar', e.target.value)} />
+                          onChange={e => noktaGuncelle(n.id, 'miktar', e.target.value)}
+                          style={{ borderColor: nErr.miktar ? 'var(--red)' : undefined }}
+                        />
+                        {nErr.miktar && (
+                          <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>
+                            Geçerli miktar girin
+                          </div>
+                        )}
                         <div className="field-hint">Yüklemeden geliyor — değiştirilebilir</div>
                       </div>
                       <div>
@@ -371,7 +415,15 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                       <div className="field-hint" style={{ marginBottom: 6, color: 'var(--text2)' }}>
                         Yükleme işçileri varsayılan — değiştirilebilir
                       </div>
-                      <div className="check-list">
+                      {nErr.isciler && (
+                        <div style={{ color: 'var(--red)', fontSize: 11, marginBottom: 4 }}>
+                          En az 1 işçi seçilmeli
+                        </div>
+                      )}
+                      <div
+                        className="check-list"
+                        style={{ borderColor: nErr.isciler ? 'var(--red)' : undefined, borderWidth: nErr.isciler ? 1 : undefined, borderStyle: nErr.isciler ? 'solid' : undefined, borderRadius: nErr.isciler ? 'var(--radius)' : undefined, padding: nErr.isciler ? 6 : undefined }}
+                      >
                         {data.isciler.length === 0
                           ? <span style={{ color: 'var(--text3)', fontSize: 12 }}>Önce işçi ekleyin</span>
                           : data.isciler.map(i => (
@@ -410,7 +462,6 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                 + İndirme Noktası Ekle
               </button>
 
-              {/* Dağılım kontrolü */}
               {toplamIndMiktar > 0 && (
                 <div style={{
                   background: toplamIndMiktar > yukM ? 'rgba(224,112,112,.08)' : toplamIndMiktar < yukM ? 'rgba(106,176,216,.08)' : 'rgba(77,217,172,.08)',
@@ -463,7 +514,7 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
         </div>
       </div>
 
-      {/* ═══ KAYITLAR — sadece yüklemeler, tıklayınca indirmeler açılır ═══ */}
+      {/* ═══ KAYITLAR ═══ */}
       <div className="panel">
         <div className="panel-header">
           <div className="panel-title">Yükleme Kayıtları</div>
@@ -495,7 +546,6 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                     const acik = acikYukleme === y.id;
                     return (
                       <React.Fragment key={y.id}>
-                        {/* ─ Yükleme satırı ─ */}
                         <tr
                           style={{ cursor: indirmeler.length > 0 ? 'pointer' : 'default' }}
                           onClick={() => indirmeler.length > 0 && setAcikYukleme(acik ? null : y.id)}>
@@ -521,7 +571,6 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                           </td>
                         </tr>
 
-                        {/* ─ İndirme satırları (açıksa) ─ */}
                         {acik && indirmeler.map((ind, idx) => {
                           const indIsci = ind.isciler
                             .map(id => data.isciler.find(i => i.id === id)?.isim || '?')

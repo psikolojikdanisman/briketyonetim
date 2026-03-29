@@ -15,6 +15,7 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
   const [miktar, setMiktar] = useState('');
   const [seciliIsciler, setSeciliIsciler] = useState<number[]>([]);
   const [not, setNot] = useState('');
+  const [errors, setErrors] = useState<{ miktar?: boolean; isciler?: boolean }>({});
 
   const toplamUcret =
     birimUcret(cesit, data.ayarlar) * (parseFloat(miktar) || 0);
@@ -25,18 +26,19 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
     setSeciliIsciler((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+    if (errors.isciler) setErrors((e) => ({ ...e, isciler: false }));
   }
 
   function kaydet() {
     const m = parseFloat(miktar);
-    if (!m || m <= 0) {
-      showToast('Miktar gerekli', false);
-      return;
-    }
-    if (seciliIsciler.length === 0) {
-      showToast('En az 1 işçi seçin', false);
-      return;
-    }
+    const newErrors = {
+      miktar: !m || m <= 0,
+      isciler: seciliIsciler.length === 0,
+    };
+    setErrors(newErrors);
+    if (newErrors.miktar) { showToast('Miktar gerekli', false); return; }
+    if (newErrors.isciler) { showToast('En az 1 işçi seçin', false); return; }
+
     const yeni: Uretim = {
       id: uid(),
       tarih,
@@ -55,6 +57,7 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
     setMiktar('');
     setSeciliIsciler([]);
     setNot('');
+    setErrors({});
     showToast('Üretim kaydedildi ✓');
   }
 
@@ -101,16 +104,34 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
               <label>Üretim Miktarı (adet)</label>
               <input
                 type="number"
+                min="1"
                 placeholder="ör: 3500"
                 value={miktar}
-                onChange={(e) => setMiktar(e.target.value)}
+                onChange={(e) => {
+                  setMiktar(e.target.value);
+                  if (errors.miktar) setErrors((er) => ({ ...er, miktar: false }));
+                }}
+                style={{ borderColor: errors.miktar ? 'var(--red)' : undefined }}
               />
+              {errors.miktar && (
+                <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>
+                  Geçerli bir miktar girin (0&apos;dan büyük)
+                </div>
+              )}
             </div>
           </div>
           <div className="frow">
             <div>
               <label>Çalışan İşçiler</label>
-              <div className="check-list">
+              {errors.isciler && (
+                <div style={{ color: 'var(--red)', fontSize: 11, marginBottom: 4 }}>
+                  En az 1 işçi seçilmeli
+                </div>
+              )}
+              <div
+                className="check-list"
+                style={{ borderColor: errors.isciler ? 'var(--red)' : undefined, borderWidth: errors.isciler ? 1 : undefined, borderStyle: errors.isciler ? 'solid' : undefined, borderRadius: errors.isciler ? 'var(--radius)' : undefined, padding: errors.isciler ? 6 : undefined }}
+              >
                 {data.isciler.length === 0 ? (
                   <span style={{ color: 'var(--text3)', fontSize: 12 }}>
                     Önce işçi ekleyin
