@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface ToastState {
   message: string;
@@ -12,19 +12,38 @@ interface ToastProps {
 }
 
 export default function Toast({ state }: ToastProps) {
-  const style: React.CSSProperties = {
-    position: 'fixed',
-    bottom: 24,
-    right: 24,
-    background: 'var(--surface)',
-    border: `1px solid ${state.ok ? 'var(--green)' : 'var(--red)'}`,
-    borderRadius: 'var(--radius)',
-    padding: '11px 18px',
-    color: 'var(--text)',
-    fontSize: 13,
-    zIndex: 9999,
-    display: state.visible ? 'block' : 'none',
-    boxShadow: '0 4px 20px rgba(0,0,0,.3)',
-  };
-  return <div style={style}>{state.message}</div>;
+  const [rendered, setRendered] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    if (state.visible && state.message) {
+      setRendered(true);
+    } else {
+      // Çıkış animasyonu bittikten sonra DOM'dan kaldır
+      timerRef.current = setTimeout(() => setRendered(false), 250);
+    }
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [state.visible, state.message]);
+
+  if (!rendered) return null;
+
+  return (
+    <div
+      role="alert"
+      aria-live="polite"
+      className={[
+        'toast',
+        state.ok ? 'toast--success' : 'toast--error',
+        state.visible ? 'toast--in' : 'toast--out',
+      ].join(' ')}
+    >
+      <span className="toast-icon">{state.ok ? '✓' : '✕'}</span>
+      <span>{state.message}</span>
+    </div>
+  );
 }

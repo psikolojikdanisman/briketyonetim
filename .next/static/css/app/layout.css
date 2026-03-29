@@ -1,7 +1,7 @@
 /*!*****************************************************************************************************************************************************************************************************************************************************************!*\
   !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[13].oneOf[10].use[3]!./src/app/globals.css ***!
   \*****************************************************************************************************************************************************************************************************************************************************************/
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Bebas+Neue&display=swap');
 *, ::before, ::after{
   --tw-border-spacing-x: 0;
   --tw-border-spacing-y: 0;
@@ -486,15 +486,15 @@ video {
 }
 
 :root {
-  --bg:       #f5f0eb;        /* sıcak krem arka plan */
-  --surface:  #fdfaf7;        /* kartlar - krem beyaz */
-  --surface2: #f0ebe4;        /* panel header, input bg */
-  --border:   #ddd5c8;        /* sıcak bej border */
+  --bg:       #f5f0eb;
+  --surface:  #fdfaf7;
+  --surface2: #f0ebe4;
+  --border:   #ddd5c8;
   --accent:   #2d7a4f;
   --accent2:  #3aa063;
-  --text:     #2a2118;        /* sıcak koyu kahve */
-  --text2:    #5c4f3d;        /* orta kahve */
-  --text3:    #a0907c;        /* soluk bej */
+  --text:     #2a2118;
+  --text2:    #5c4f3d;
+  --text3:    #a0907c;
   --green:    #2d7a4f;
   --red:      #b83c2b;
   --blue:     #2563eb;
@@ -503,6 +503,12 @@ video {
   --sidebar-w: 240px;
   --shadow-card: 0 1px 3px rgba(0,0,0,0.05), 0 4px 14px rgba(0,0,0,0.05);
   --shadow-soft: 0 2px 8px rgba(45,122,79,0.10);
+
+  /* ── Alias değişkenler: birçok sayfada kullanılan eksik isimler ── */
+  --primary:  #2d7a4f;   /* var(--primary) → accent ile aynı      */
+  --danger:   #b83c2b;   /* var(--danger)  → red ile aynı         */
+  --success:  #2d7a4f;   /* var(--success) → green ile aynı       */
+  --warning:  #d97706;   /* var(--warning) → amber ile aynı       */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -856,6 +862,7 @@ textarea { resize: vertical; min-height: 60px; }
 .btn-sm { padding: 5px 12px; font-size: 12px; }
 
 .btn-primary:active, .btn-secondary:active { transform: translateY(0); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 
 /* ─── TABLE ─── */
 .table-wrap { overflow-x: auto; }
@@ -985,23 +992,43 @@ tr:hover td { background: rgba(45,122,79,0.04); color: var(--text); }
 /* ─── TOAST ─── */
 .toast {
   position: fixed;
-  bottom: 24px; right: 24px;
+  bottom: 24px;
+  right: 24px;
   background: var(--surface);
-  border: 1.5px solid var(--green);
   border-radius: var(--radius);
   padding: 12px 20px;
   color: var(--text);
   font-size: 13.5px;
   z-index: 9999;
-  display: none;
   box-shadow: 0 4px 20px rgba(0,0,0,0.10);
-  animation: slideIn .2s ease;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+  pointer-events: none;
 }
 
-@keyframes slideIn {
-  from { transform: translateY(10px); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
+.toast--success { border: 1.5px solid var(--green); }
+.toast--error   { border: 1.5px solid var(--red); }
+
+.toast-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.toast--success .toast-icon { color: var(--green); }
+.toast--error   .toast-icon { color: var(--red); }
+
+.toast--in  { animation: toastIn  0.22s ease forwards; }
+.toast--out { animation: toastOut 0.22s ease forwards; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(12px); }
 }
 
 /* ─── MISC ─── */

@@ -1,4 +1,5 @@
 'use client';
+import { useMemo } from 'react';
 import type { PageKey } from '@/types';
 
 interface SidebarProps {
@@ -47,8 +48,16 @@ const NAV_ITEMS: {
 ];
 
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  // Sadece component mount'ta hesaplanır, her render'da yeniden çalışmaz
+  const dateStr = useMemo(
+    () =>
+      new Date().toLocaleDateString('tr-TR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }),
+    []
+  );
 
   // isci-detay sayfasındayken isciler nav-item'ı aktif göster
   const effectivePage = activePage === 'isci-detay' ? 'isciler' : activePage;
@@ -57,7 +66,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
     <aside className="sidebar">
       {/* Başlık */}
       <div className="logo">
-        <div style={{ fontWeight: 700, fontSize: 16, letterSpacing: 0.5 }}>İdooğlu Briket</div>
+        <div className="logo-title">İdooğlu Briket</div>
         <div className="logo-sub">İmalat Takip Sistemi</div>
       </div>
 
@@ -68,16 +77,23 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
             {group.section && (
               <div className="nav-section">{group.section}</div>
             )}
-            {group.items?.map((item) => (
-              <div
-                key={item.key}
-                className={`nav-item${effectivePage === item.key ? ' active' : ''}`}
-                onClick={() => onNavigate(item.key)}
-              >
-                <span className="icon">{item.icon}</span>
-                {item.label}
-              </div>
-            ))}
+            {group.items?.map((item) => {
+              const isActive = effectivePage === item.key;
+              return (
+                <div
+                  key={item.key}
+                  className={`nav-item${isActive ? ' active' : ''}`}
+                  onClick={() => onNavigate(item.key)}
+                  onKeyDown={(e) => e.key === 'Enter' && onNavigate(item.key)}
+                  role="button"
+                  tabIndex={0}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  <span className="icon">{item.icon}</span>
+                  {item.label}
+                </div>
+              );
+            })}
           </div>
         ))}
       </nav>

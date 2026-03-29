@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import type { AppData } from '@/types';
-import { tl, fd, buHafta, buAy, GIDER_LABEL } from '@/lib/storage';
+import { tl, fd, buHafta, buAy } from '@/lib/storage';
 
 interface DashboardProps {
   data: AppData;
@@ -90,7 +90,7 @@ export default function Dashboard({ data }: DashboardProps) {
 
   const toplamTedarikBorc = tedarikBorc.reduce((s, t) => s + t.kalan, 0);
 
-  // ── Bu gün teslimatlar ───────────────────────────────────────────────────
+  // ── Bugün teslimatlar ────────────────────────────────────────────────────
   const bugunTeslimatlar = data.teslimatlar
     .filter(t => t.tarih === today)
     .slice(0, 5);
@@ -103,7 +103,9 @@ export default function Dashboard({ data }: DashboardProps) {
       const sT = data.spotSatislar.filter(x => x.musteriId === m.id).reduce((a, x) => a + (x.tutar - x.tahsil), 0);
       const soT = data.spotOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
       const alacak = Math.max(0, tT + sT - oT - soT);
-      const sonIslem = [...data.teslimatlar].filter(t => t.musteriId === m.id).sort((a, b) => b.tarih.localeCompare(a.tarih))[0];
+      const sonIslem = [...data.teslimatlar]
+        .filter(t => t.musteriId === m.id)
+        .sort((a, b) => b.tarih.localeCompare(a.tarih))[0];
       return { m, alacak, sonIslem };
     })
     .filter(x => x.alacak > 0)
@@ -143,28 +145,50 @@ export default function Dashboard({ data }: DashboardProps) {
     return p[2] + '.' + p[1];
   }
 
+  // Grafik renkleri — uygulamanın CSS değişkenleriyle uyumlu
+  const C_GREEN       = 'rgba(45,122,79,0.70)';
+  const C_GREEN_B     = '#2d7a4f';
+  const C_GREEN_LIGHT = 'rgba(58,160,99,0.45)';
+  const C_AMBER       = 'rgba(217,119,6,0.65)';
+  const C_BLUE        = 'rgba(37,99,235,0.55)';
+  const C_BLUE_B      = '#2563eb';
+  const C_RED         = 'rgba(184,60,43,0.55)';
+  const C_PURPLE      = 'rgba(139,92,246,0.55)';
+  const C_SLATE       = 'rgba(148,163,184,0.55)';
+
+  // Tooltip ve eksen renkleri — uygulamanın sıcak paletinden
+  const tooltipStyle = {
+    backgroundColor: '#2a2118',   // --text
+    titleColor:      '#fdfaf7',   // --surface
+    bodyColor:       '#a0907c',   // --text3
+    borderColor:     '#ddd5c8',   // --border
+    borderWidth:     1,
+  };
+
+  const axisStyle = {
+    grid:  { color: 'rgba(221,213,200,0.5)' },   // --border hafif
+    ticks: { color: '#a0907c', font: { size: 10 } }, // --text3
+  };
+
   const chartDefaults = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
-      tooltip: {
-        backgroundColor: '#1e3235',
-        titleColor: '#d0f0ee',
-        bodyColor: '#7abcba',
-        borderColor: '#2a4a4e',
-        borderWidth: 1,
-      },
+      tooltip: tooltipStyle,
     },
     scales: {
-      x: { grid: { color: 'rgba(42,74,78,.4)' }, ticks: { color: '#3d7070', font: { size: 10 } } },
-      y: { grid: { color: 'rgba(42,74,78,.4)' }, ticks: { color: '#7abcba', font: { size: 10 } }, beginAtZero: true },
+      x: { grid: axisStyle.grid, ticks: axisStyle.ticks },
+      y: { grid: axisStyle.grid, ticks: axisStyle.ticks, beginAtZero: true },
     },
   };
 
   function drawCharts() {
-    const Chart = (window as Record<string, unknown>).Chart as { new(ctx: HTMLCanvasElement, config: unknown): unknown };
+    const Chart = (window as Record<string, unknown>).Chart as {
+      new(ctx: HTMLCanvasElement, config: unknown): unknown;
+    };
     if (!Chart) return;
+
     Object.values(chartsRef.current).forEach((c: unknown) => {
       if (c && typeof (c as { destroy: () => void }).destroy === 'function')
         (c as { destroy: () => void }).destroy();
@@ -180,9 +204,11 @@ export default function Dashboard({ data }: DashboardProps) {
           labels: gunler.map(dKisa),
           datasets: [{
             label: 'Üretim (adet)',
-            data: gunler.map(g => data.uretimler.filter(u => u.tarih === g).reduce((s, u) => s + u.miktar, 0)),
-            backgroundColor: 'rgba(46,196,182,.55)',
-            borderColor: '#2ec4b6',
+            data: gunler.map(g =>
+              data.uretimler.filter(u => u.tarih === g).reduce((s, u) => s + u.miktar, 0)
+            ),
+            backgroundColor: C_GREEN,
+            borderColor: C_GREEN_B,
             borderWidth: 0,
             borderRadius: 4,
           }],
@@ -200,14 +226,18 @@ export default function Dashboard({ data }: DashboardProps) {
           datasets: [
             {
               label: 'Sipariş Teslimat',
-              data: gunler.map(g => data.teslimatlar.filter(t => t.tarih === g).reduce((s, t) => s + t.adet, 0)),
-              backgroundColor: 'rgba(106,176,216,.6)',
+              data: gunler.map(g =>
+                data.teslimatlar.filter(t => t.tarih === g).reduce((s, t) => s + t.adet, 0)
+              ),
+              backgroundColor: C_BLUE,
               borderRadius: 3,
             },
             {
               label: 'Spot Satış',
-              data: gunler.map(g => data.spotSatislar.filter(s => s.tarih === g).reduce((s, x) => s + x.adet, 0)),
-              backgroundColor: 'rgba(77,217,172,.6)',
+              data: gunler.map(g =>
+                data.spotSatislar.filter(s => s.tarih === g).reduce((s, x) => s + x.adet, 0)
+              ),
+              backgroundColor: C_GREEN_LIGHT,
               borderRadius: 3,
             },
           ],
@@ -215,8 +245,11 @@ export default function Dashboard({ data }: DashboardProps) {
         options: {
           ...chartDefaults,
           plugins: {
-            legend: { display: true, labels: { color: '#7abcba', font: { size: 11 }, boxWidth: 12 } },
-            tooltip: chartDefaults.plugins.tooltip,
+            legend: {
+              display: true,
+              labels: { color: '#5c4f3d', font: { size: 11 }, boxWidth: 12 }, // --text2
+            },
+            tooltip: tooltipStyle,
           },
         },
       });
@@ -228,7 +261,10 @@ export default function Dashboard({ data }: DashboardProps) {
       const now2 = new Date();
       const aylar = Array.from({ length: 6 }, (_, i) => {
         const d = new Date(now2.getFullYear(), now2.getMonth() - (5 - i), 1);
-        return { str: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), lbl: ayAd[d.getMonth()] };
+        return {
+          str: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'),
+          lbl: ayAd[d.getMonth()],
+        };
       });
       chartsRef.current.c4 = new Chart(chart4Ref.current, {
         type: 'bar',
@@ -241,8 +277,8 @@ export default function Dashboard({ data }: DashboardProps) {
                 data.teslimatlar.filter(t => t.tarih.startsWith(a.str)).reduce((s, t) => s + t.tutar, 0) +
                 data.spotSatislar.filter(s => s.tarih.startsWith(a.str)).reduce((s, x) => s + x.tutar, 0)
               ),
-              backgroundColor: 'rgba(106,176,216,.5)',
-              borderColor: '#6ab0d8',
+              backgroundColor: C_BLUE,
+              borderColor: C_BLUE_B,
               borderWidth: 1,
               borderRadius: 4,
             },
@@ -254,8 +290,8 @@ export default function Dashboard({ data }: DashboardProps) {
                 data.spotSatislar.filter(s => s.tarih.startsWith(a.str)).reduce((s, x) => s + x.tahsil, 0) +
                 data.spotOdemeler.filter(o => o.tarih.startsWith(a.str)).reduce((s, o) => s + o.tutar, 0)
               ),
-              backgroundColor: 'rgba(77,217,172,.6)',
-              borderColor: '#4dd9ac',
+              backgroundColor: C_GREEN,
+              borderColor: C_GREEN_B,
               borderWidth: 1,
               borderRadius: 4,
             },
@@ -264,8 +300,11 @@ export default function Dashboard({ data }: DashboardProps) {
         options: {
           ...chartDefaults,
           plugins: {
-            legend: { display: true, labels: { color: '#7abcba', font: { size: 11 }, boxWidth: 12 } },
-            tooltip: chartDefaults.plugins.tooltip,
+            legend: {
+              display: true,
+              labels: { color: '#5c4f3d', font: { size: 11 }, boxWidth: 12 },
+            },
+            tooltip: tooltipStyle,
           },
         },
       });
@@ -289,7 +328,7 @@ export default function Dashboard({ data }: DashboardProps) {
           labels: katLabels,
           datasets: [{
             data: katData,
-            backgroundColor: ['#f6c90e','#2ec4b6','#4dd9ac','#6ab0d8','#a78bfa','#94a3b8'],
+            backgroundColor: [C_AMBER, C_GREEN, C_GREEN_LIGHT, C_BLUE, C_PURPLE, C_SLATE],
             borderWidth: 0,
           }],
         },
@@ -297,8 +336,12 @@ export default function Dashboard({ data }: DashboardProps) {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { display: true, position: 'right', labels: { color: '#7abcba', font: { size: 10 }, boxWidth: 10 } },
-            tooltip: chartDefaults.plugins.tooltip,
+            legend: {
+              display: true,
+              position: 'right',
+              labels: { color: '#5c4f3d', font: { size: 10 }, boxWidth: 10 },
+            },
+            tooltip: tooltipStyle,
           },
         },
       });
@@ -334,13 +377,17 @@ export default function Dashboard({ data }: DashboardProps) {
       {/* ── Grafikler: Üretim + Satış ── */}
       <div className="two-col" style={{ marginBottom: 16 }}>
         <div className="panel">
-          <div className="panel-header"><div className="panel-title">Son 14 Gün — Üretim</div></div>
+          <div className="panel-header">
+            <div className="panel-title">Son 14 Gün — Üretim</div>
+          </div>
           <div className="panel-body" style={{ padding: '14px 18px', height: 220 }}>
             <canvas ref={chart1Ref} />
           </div>
         </div>
         <div className="panel">
-          <div className="panel-header"><div className="panel-title">Son 14 Gün — Satış (Adet)</div></div>
+          <div className="panel-header">
+            <div className="panel-title">Son 14 Gün — Satış (Adet)</div>
+          </div>
           <div className="panel-body" style={{ padding: '14px 18px', height: 220 }}>
             <canvas ref={chart2Ref} />
           </div>
@@ -349,7 +396,9 @@ export default function Dashboard({ data }: DashboardProps) {
 
       {/* ── Bu Ay Nakit Akışı ── */}
       <div className="panel" style={{ marginBottom: 16 }}>
-        <div className="panel-header"><div className="panel-title">Bu Ay — Nakit Akışı</div></div>
+        <div className="panel-header">
+          <div className="panel-title">Bu Ay — Nakit Akışı</div>
+        </div>
         <div className="panel-body">
           <div className="stat-grid">
             <div className="stat-card">
@@ -369,23 +418,32 @@ export default function Dashboard({ data }: DashboardProps) {
             </div>
             <div className="stat-card">
               <div className="stat-label">Net (Tahsilat − Gider)</div>
-              <div className={`stat-value ${ayNetKar >= 0 ? 'c-green' : 'c-red'}`} style={{ fontSize: 20 }}>{tl(ayNetKar)}</div>
+              <div className={`stat-value ${ayNetKar >= 0 ? 'c-green' : 'c-red'}`} style={{ fontSize: 20 }}>
+                {tl(ayNetKar)}
+              </div>
               <div className="stat-sub">tahmini</div>
             </div>
           </div>
 
           {/* Gider detay satırı */}
           <div style={{
-            display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12,
-            padding: '10px 14px', background: 'var(--surface)', borderRadius: 'var(--radius)',
-            border: '1px solid var(--border)', fontSize: 12, fontFamily: 'IBM Plex Mono, monospace',
+            display: 'flex',
+            gap: 8,
+            flexWrap: 'wrap',
+            marginTop: 12,
+            padding: '10px 14px',
+            background: 'var(--surface2)',
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+            fontSize: 12,
+            fontFamily: 'JetBrains Mono, monospace',
           }}>
             <span style={{ color: 'var(--text3)', marginRight: 4 }}>Gider dağılımı:</span>
-            <span>İşçi <span style={{ color: 'var(--danger)' }}>{tl(ayIsciOdeme)}</span></span>
+            <span>İşçi <span style={{ color: 'var(--red)' }}>{tl(ayIsciOdeme)}</span></span>
             <span style={{ color: 'var(--border)' }}>|</span>
-            <span>Malzeme <span style={{ color: 'var(--danger)' }}>{tl(ayMalzemeGider)}</span></span>
+            <span>Malzeme <span style={{ color: 'var(--red)' }}>{tl(ayMalzemeGider)}</span></span>
             <span style={{ color: 'var(--border)' }}>|</span>
-            <span>Diğer Giderler <span style={{ color: 'var(--danger)' }}>{tl(ayDigerGider)}</span></span>
+            <span>Diğer Giderler <span style={{ color: 'var(--red)' }}>{tl(ayDigerGider)}</span></span>
           </div>
         </div>
       </div>
@@ -393,13 +451,17 @@ export default function Dashboard({ data }: DashboardProps) {
       {/* ── Tahsilat Grafiği + Gider Donut ── */}
       <div className="two-col" style={{ marginBottom: 16 }}>
         <div className="panel">
-          <div className="panel-header"><div className="panel-title">Aylık Tahsilat vs Satış</div></div>
+          <div className="panel-header">
+            <div className="panel-title">Aylık Tahsilat vs Satış</div>
+          </div>
           <div className="panel-body" style={{ padding: '14px 18px', height: 220 }}>
             <canvas ref={chart4Ref} />
           </div>
         </div>
         <div className="panel">
-          <div className="panel-header"><div className="panel-title">Bu Ay Gider Dağılımı</div></div>
+          <div className="panel-header">
+            <div className="panel-title">Bu Ay Gider Dağılımı</div>
+          </div>
           <div className="panel-body" style={{ padding: '14px 18px', height: 220 }}>
             <canvas ref={chart5Ref} />
           </div>
@@ -411,8 +473,8 @@ export default function Dashboard({ data }: DashboardProps) {
         <div className="panel">
           <div className="panel-header">
             <div className="panel-title">Bu Hafta İşçi Durumu</div>
-            <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace' }}>
-              Toplam borç: <strong style={{ color: 'var(--danger)' }}>{tl(haftaIsciBorc)}</strong>
+            <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace' }}>
+              Toplam borç: <strong style={{ color: 'var(--red)' }}>{tl(haftaIsciBorc)}</strong>
             </span>
           </div>
           <div className="panel-body-0">
@@ -425,9 +487,15 @@ export default function Dashboard({ data }: DashboardProps) {
                   <tr><td colSpan={4} className="empty">İşçi yok</td></tr>
                 ) : data.isciler.map(i => {
                   const kazanc =
-                    data.uretimler.filter(u => u.tarih >= haftaBas && u.isciler.includes(i.id)).reduce((s, u) => s + u.kisiBasiUcret, 0) +
-                    data.yuklemeler.filter(y => y.tarih >= haftaBas && y.isciler.includes(i.id)).reduce((s, y) => s + y.kisiBasiUcret, 0);
-                  const odenen = data.avanslar.filter(a => a.isciId === i.id && a.tarih >= haftaBas).reduce((s, a) => s + a.tutar, 0);
+                    data.uretimler
+                      .filter(u => u.tarih >= haftaBas && u.isciler.includes(i.id))
+                      .reduce((s, u) => s + u.kisiBasiUcret, 0) +
+                    data.yuklemeler
+                      .filter(y => y.tarih >= haftaBas && y.isciler.includes(i.id))
+                      .reduce((s, y) => s + y.kisiBasiUcret, 0);
+                  const odenen = data.avanslar
+                    .filter(a => a.isciId === i.id && a.tarih >= haftaBas)
+                    .reduce((s, a) => s + a.tutar, 0);
                   const kalan = kazanc - odenen;
                   return (
                     <tr key={i.id}>
@@ -446,8 +514,8 @@ export default function Dashboard({ data }: DashboardProps) {
         <div className="panel">
           <div className="panel-header">
             <div className="panel-title">Tedarikçi Borç Durumu</div>
-            <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace' }}>
-              Toplam: <strong style={{ color: 'var(--danger)' }}>{tl(toplamTedarikBorc)}</strong>
+            <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace' }}>
+              Toplam: <strong style={{ color: 'var(--red)' }}>{tl(toplamTedarikBorc)}</strong>
             </span>
           </div>
           <div className="panel-body-0">
@@ -473,7 +541,9 @@ export default function Dashboard({ data }: DashboardProps) {
       {/* ── Bugün Teslimatlar + Borçlu Müşteriler ── */}
       <div className="two-col">
         <div className="panel">
-          <div className="panel-header"><div className="panel-title">Bugün Teslimatlar</div></div>
+          <div className="panel-header">
+            <div className="panel-title">Bugün Teslimatlar</div>
+          </div>
           <div className="panel-body-0">
             <table>
               <thead>
@@ -504,7 +574,9 @@ export default function Dashboard({ data }: DashboardProps) {
         </div>
 
         <div className="panel">
-          <div className="panel-header"><div className="panel-title">Borçlu Müşteriler</div></div>
+          <div className="panel-header">
+            <div className="panel-title">Borçlu Müşteriler</div>
+          </div>
           <div className="panel-body-0">
             <table>
               <thead>
@@ -518,7 +590,9 @@ export default function Dashboard({ data }: DashboardProps) {
                     <td className="td-bold">{m.isim}</td>
                     <td style={{ fontSize: 12, color: 'var(--text2)' }}>{m.koy || m.bolge || '—'}</td>
                     <td className="td-mono negative">{tl(alacak)}</td>
-                    <td>{sonIslem ? fd(sonIslem.tarih) : '—'}</td>
+                    <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
+                      {sonIslem ? fd(sonIslem.tarih) : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
