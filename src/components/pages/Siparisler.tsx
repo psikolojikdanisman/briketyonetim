@@ -9,9 +9,9 @@ function varsayilanFiyat(cesit: string, bolge: string, data: AppData): string {
   const fp = data.ayarlar?.fp;
   if (!fp) return '';
   const b = (bolge === 'merkez' || bolge === 'yakin') ? bolge : 'merkez';
-  const row = fp[cesit as keyof typeof fp];
-  if (!row) return '';
-  const val = (row as Record<string, number>)[b];
+  // fp içinde cesit anahtarı yok (10luk, 15lik, 20lik); briketler için bölgeye göre fiyat al
+  const fpAsAny = fp as Record<string, number>;
+  const val = fpAsAny[b];
   return val ? String(val) : '';
 }
 
@@ -302,7 +302,6 @@ function SiparisDuzenleModal({ siparis, onKaydet, onKapat }: DuzenleModalProps) 
     const yeniFiyat = parseFloat(fiyat);
     if (!yeniAdet || yeniAdet <= 0)  return;
     if (!yeniFiyat || yeniFiyat <= 0) return;
-    // Gonderilen yeni adetten fazla olamaz
     const yeniGonderilen = Math.min(siparis.gonderilen, yeniAdet);
     onKaydet({
       ...siparis,
@@ -683,8 +682,6 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
     !koyAra || k.isim.toLowerCase().includes(koyAra.toLowerCase())
   );
 
-  // ─── Sipariş grupları: tüm kalemleri tamamlanmış gruplar LİSTEDEN DÜŞER ──
-  // Not: data.siparisler'den SİLMİYORUZ — teslimat geçmişi bağlantısı korunur.
   const sipGruplari = useMemo(() => {
     const map = new Map<number, Siparis[]>();
     for (const s of data.siparisler) {
@@ -692,7 +689,6 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
       map.get(s.musteriId)!.push(s);
     }
     return Array.from(map.entries())
-      // Grubun en az 1 kalemi hâlâ açıksa listede göster
       .filter(([, kalemler]) => kalemler.some(s => s.gonderilen < s.adet))
       .sort((a, b) => {
         const aAcil = a[1].some(s => (s as Siparis & { oncelik?: string }).oncelik === 'acil') ? 0 : 1;
@@ -705,7 +701,6 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
       });
   }, [data.siparisler, sipSiralama]);
 
-  // Toplam açık sipariş sayısını header'da göstermek için
   const toplamAcikKalem = useMemo(
     () => data.siparisler.filter(s => s.gonderilen < s.adet).length,
     [data.siparisler]
@@ -768,7 +763,6 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
   }
 
   function sipDurumBadge(kalemler: Siparis[]) {
-    // Bu fonksiyon artık sadece açık kalemler için çağrılır, ama yine de tam tutalım
     if (kalemler.every(s => s.gonderilen >= s.adet)) return { cls: 'b-green', label: 'Tamamlandı' };
     if (kalemler.every(s => s.gonderilen === 0))     return { cls: 'b-red',   label: 'Bekliyor'   };
     return { cls: 'b-yellow', label: 'Kısmi' };
@@ -1085,7 +1079,6 @@ export default function SiparislerPage({ data, onSave, showToast }: SiparislerPr
                 {sipGruplari.length === 0 ? (
                   <tr><td colSpan={9} className="empty">Tüm siparişler tamamlandı 🎉</td></tr>
                 ) : sipGruplari.flatMap(([musteriId, tumKalemler]) => {
-                  // Bu grupta sadece açık kalemleri göster (tamamlananlar alt satırda da görünmesin)
                   const acikKalemler = tumKalemler.filter(s => s.gonderilen < s.adet);
                   const m        = data.musteriler.find(x => x.id === musteriId);
                   const badge    = sipDurumBadge(acikKalemler);

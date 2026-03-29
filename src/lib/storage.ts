@@ -60,8 +60,10 @@ export function loadData(): AppData {
     const merged: AppData = { ...defaultData, ...parsed };
     if (!merged.yonetici) merged.yonetici = { ...defaultYonetici };
     // fp migration: eski yapıdan yeni yapıya geç
-    if (!merged.ayarlar.fp || typeof merged.ayarlar.fp['10luk'] !== 'undefined') {
-      merged.ayarlar.fp = defaultAyarlar.fp;
+    // Eski yapıda '10luk', '15lik', '20lik' gibi anahtarlar olabilir — bunlar FiyatTarifeleri'nde yok
+    const fpAsAny = merged.ayarlar.fp as Record<string, unknown>;
+    if (!merged.ayarlar.fp || fpAsAny['10luk'] !== undefined) {
+      merged.ayarlar.fp = { ...defaultAyarlar.fp };
     }
     if (merged.ayarlar.fp.merkez === undefined) merged.ayarlar.fp.merkez = 0;
     if (merged.ayarlar.fp.yakin === undefined) merged.ayarlar.fp.yakin = 0;
