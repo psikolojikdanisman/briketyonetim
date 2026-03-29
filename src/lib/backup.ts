@@ -1,5 +1,7 @@
 import type { AppData } from '@/types';
 
+export const BACKUP_KEY = 'briket_last_backup';
+
 // ─── EXPORT ──────────────────────────────────────────────────────────────────
 
 export function exportJSON(data: AppData): void {
@@ -13,6 +15,13 @@ export function exportJSON(data: AppData): void {
   a.download = `briket-yedek-${tarih}.json`;
   a.click();
   URL.revokeObjectURL(url);
+
+  // Son yedek tarihini kaydet → banner sıfırlanır
+  try {
+    localStorage.setItem(BACKUP_KEY, new Date().toISOString());
+  } catch {
+    // ignore
+  }
 }
 
 // ─── IMPORT ──────────────────────────────────────────────────────────────────
