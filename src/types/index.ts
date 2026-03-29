@@ -31,6 +31,8 @@ export interface Yukleme {
   kisiBasiUcret: number;
   toplamUcret: number;
   not?: string;
+  /** İndirme kayıtlarının bağlı olduğu yükleme ID'si */
+  yuklemeId?: number;
 }
 
 export interface Avans {
@@ -74,6 +76,7 @@ export interface Siparis {
   birim: string;
   tarih: string;
   not?: string;
+  oncelik?: 'normal' | 'acil';
 }
 
 export interface Teslimat {
@@ -92,6 +95,19 @@ export interface Teslimat {
   tarih: string;
   not?: string;
   birim?: string;
+}
+
+/**
+ * Geçmiş borç girişi için ayrı tip — Teslimat'ı kirletmemek için.
+ * siparisId: 0 hack'i yerine bu kullanılır.
+ */
+export interface GecmisBorc {
+  id: number;
+  musteriId: number;
+  tutar: number;
+  tarih: string;
+  aciklama?: string;
+  detay?: string; // "10luk: 500 | 15lik: 300 | ..."
 }
 
 export interface MusteriOdeme {
@@ -211,6 +227,7 @@ export interface AppData {
   musteriler: Musteri[];
   siparisler: Siparis[];
   teslimatlar: Teslimat[];
+  gecmisBorclar: GecmisBorc[];
   musteriOdemeler: MusteriOdeme[];
   malzemeler: Malzeme[];
   tedarikOdemeler: TedarikOdeme[];

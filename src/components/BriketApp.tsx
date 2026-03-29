@@ -1,7 +1,13 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { AppData, PageKey } from '@/types';
-import { loadData, saveData, PAGE_TITLES } from '@/lib/storage';
+import {
+  loadData,
+  saveData,
+  PAGE_TITLES,
+  backupGerekliMi,
+  backupTarihiGuncelle,
+} from '@/lib/storage';
 import Sidebar from './Sidebar';
 import Toast, { type ToastState } from './Toast';
 import Dashboard from './pages/Dashboard';
@@ -17,28 +23,31 @@ import GiderlerPage from './pages/Giderler';
 import KoylerPage from './pages/Koyler';
 import AyarlarPage from './pages/Ayarlar';
 
-const BACKUP_KEY = 'briket_last_backup';
-const BACKUP_UYARI_GUN = 7;
+const BACKUP_UYARI_GUN_LABEL = 7;
 
 export default function BriketApp() {
-  const [data, setData] = useState<AppData | null>(null);
-  const [page, setPage] = useState<PageKey>('dashboard');
+  const [data, setData]           = useState<AppData | null>(null);
+  const [page, setPage]           = useState<PageKey>('dashboard');
   const [aktifIsciId, setAktifIsciId] = useState<number | null>(null);
-  const [toast, setToast] = useState<ToastState>({ message: '', ok: true, visible: false });
-  const [dateStr, setDateStr] = useState('');
+  const [toast, setToast]         = useState<ToastState>({ message: '', ok: true, visible: false });
+  const [dateStr, setDateStr]     = useState('');
+
+  // Backup banner — client-only, SSR'de çalışmaz
+  const [backupUyari, setBackupUyari]           = useState(false);
   const [backupBannerKapali, setBackupBannerKapali] = useState(false);
 
   useEffect(() => {
     setData(loadData());
-    const now = new Date();
     setDateStr(
-      now.toLocaleDateString('tr-TR', {
+      new Date().toLocaleDateString('tr-TR', {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
         year: 'numeric',
       })
     );
+    // SSR-safe backup kontrolü — sadece client'ta çalışır
+    setBackupUyari(backupGerekliMi());
   }, []);
 
   const handleSave = useCallback((newData: AppData) => {
@@ -51,20 +60,12 @@ export default function BriketApp() {
     setTimeout(() => setToast((t) => ({ ...t, visible: false })), 2800);
   }, []);
 
-  // ── Yedek hatırlatıcı ──────────────────────────────────────────────────────
-  const backupUyariGoster = useMemo(() => {
-    if (backupBannerKapali) return false;
-    try {
-      const son = localStorage.getItem(BACKUP_KEY);
-      if (!son) return true; // Hiç yedek alınmamış
-      const fark = (Date.now() - new Date(son).getTime()) / (1000 * 60 * 60 * 24);
-      return fark >= BACKUP_UYARI_GUN;
-    } catch {
-      return false;
-    }
-  }, [backupBannerKapali]);
+  const backupUyariGoster = useMemo(
+    () => backupUyari && !backupBannerKapali,
+    [backupUyari, backupBannerKapali]
+  );
 
-  // ── İşçi detay navigasyon ──────────────────────────────────────────────────
+  // ── İşçi detay navigasyon ──────────────────────────────────────────────
   const isciDetayGit = useCallback((isciId: number) => {
     setAktifIsciId(isciId);
     setPage('isci-detay');
@@ -76,9 +77,7 @@ export default function BriketApp() {
   }, []);
 
   const handleNavigate = useCallback((newPage: PageKey) => {
-    if (newPage !== 'isci-detay') {
-      setAktifIsciId(null);
-    }
+    if (newPage !== 'isci-detay') setAktifIsciId(null);
     setPage(newPage);
   }, []);
 
@@ -116,9 +115,10 @@ export default function BriketApp() {
 
   const pageProps = { data, onSave: handleSave, showToast };
 
-  const topbarTitle = page === 'isci-detay' && aktifIsciId
-    ? (data.isciler.find(i => i.id === aktifIsciId)?.isim?.toUpperCase() || 'İŞÇİ PROFİLİ')
-    : (PAGE_TITLES[page] || page);
+  const topbarTitle =
+    page === 'isci-detay' && aktifIsciId
+      ? (data.isciler.find((i) => i.id === aktifIsciId)?.isim?.toUpperCase() || 'İŞÇİ PROFİLİ')
+      : (PAGE_TITLES[page] || page);
 
   return (
     <div className="layout">
@@ -140,7 +140,7 @@ export default function BriketApp() {
             <span style={{ fontSize: 16 }}>⚠️</span>
             <span style={{ flex: 1 }}>
               <strong>Veri yedeği alınmadı.</strong>
-              {' '}Son {BACKUP_UYARI_GUN} günde yedek bulunamadı — veri kaybını önlemek için Ayarlar sayfasından JSON yedeği alın.
+              {' '}Son {BACKUP_UYARI_GUN_LABEL} günde yedek bulunamadı — veri kaybını önlemek için Ayarlar sayfasından JSON yedeği alın.
             </span>
             <button
               onClick={() => {
@@ -191,11 +191,7 @@ export default function BriketApp() {
           {page === 'yukleme'     && <YuklemePage {...pageProps} />}
           {page === 'isciler'     && <IscilerPage {...pageProps} onIsciDetay={isciDetayGit} />}
           {page === 'isci-detay'  && aktifIsciId !== null && (
-            <IsciDetay
-              {...pageProps}
-              isciId={aktifIsciId}
-              onGeri={isciDetayGeri}
-            />
+            <IsciDetay {...pageProps} isciId={aktifIsciId} onGeri={isciDetayGeri} />
           )}
           {page === 'siparisler'  && <SiparislerPage {...pageProps} />}
           {page === 'spotsatis'   && <SpotSatisPage {...pageProps} />}
@@ -203,7 +199,16 @@ export default function BriketApp() {
           {page === 'malzeme'     && <MalzemePage {...pageProps} />}
           {page === 'giderler'    && <GiderlerPage {...pageProps} />}
           {page === 'koyler'      && <KoylerPage {...pageProps} />}
-          {page === 'ayarlar'     && <AyarlarPage {...pageProps} />}
+          {page === 'ayarlar'     && (
+            <AyarlarPage
+              {...pageProps}
+              onBackupAlindi={() => {
+                backupTarihiGuncelle();
+                setBackupUyari(false);
+                setBackupBannerKapali(false);
+              }}
+            />
+          )}
         </div>
       </div>
 
