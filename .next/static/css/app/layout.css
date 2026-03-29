@@ -562,6 +562,21 @@ html, body {
   text-transform: uppercase;
 }
 
+/* ─── LOGO SVG ─── */
+.logo-svg {
+  display: block;
+  width: 100%;
+  max-width: 172px;
+  height: auto;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+
+.logo:hover .logo-svg {
+  color: var(--accent2);
+  transition: color 0.2s ease;
+}
+
 nav { padding: 10px 0; flex: 1; overflow-y: auto; }
 
 .nav-section {

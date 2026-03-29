@@ -43,6 +43,17 @@ export default function MusterilerPage({ data, onSave, showToast }: MusterilerPr
   const [gbSeferSayisi, setGbSeferSayisi] = useState('');
   const [gbDetayAcik, setGbDetayAcik] = useState(false);
 
+  // ── Cascade silme onay state'i ───────────────────────────────────────────
+  const [silOnay, setSilOnay] = useState<{
+    musteriId: number;
+    musteriIsim: string;
+    siparisCount: number;
+    teslimatCount: number;
+    odemeCount: number;
+    spotCount: number;
+    toplamBorc: number;
+  } | null>(null);
+
   function mbHesapla(mid: number) {
     const tT  = data.teslimatlar.filter(t => t.musteriId === mid).reduce((s, t) => s + (t.tutar - t.tahsil), 0);
     const oT  = data.musteriOdemeler.filter(o => o.musteriId === mid).reduce((s, o) => s + o.tutar, 0);
@@ -88,7 +99,23 @@ export default function MusterilerPage({ data, onSave, showToast }: MusterilerPr
     showToast('Müşteri eklendi');
   }
 
-  function musteriSil(id: number) {
+  function musteriSilIste(id: number) {
+    const musteri = data.musteriler.find(m => m.id === id);
+    if (!musteri) return;
+    const siparisCount  = data.siparisler.filter(s => s.musteriId === id).length;
+    const teslimatCount = data.teslimatlar.filter(t => t.musteriId === id).length;
+    const odemeCount    = data.musteriOdemeler.filter(o => o.musteriId === id).length;
+    const spotCount     = data.spotSatislar.filter(s => s.musteriId === id).length;
+    const toplamBorc    = mbHesapla(id);
+
+    if (siparisCount > 0 || teslimatCount > 0 || odemeCount > 0 || spotCount > 0) {
+      setSilOnay({ musteriId: id, musteriIsim: musteri.isim, siparisCount, teslimatCount, odemeCount, spotCount, toplamBorc });
+    } else {
+      musteriSilOnayla(id);
+    }
+  }
+
+  function musteriSilOnayla(id: number) {
     onSave({
       ...data,
       musteriler: data.musteriler.filter(m => m.id !== id),
@@ -96,6 +123,7 @@ export default function MusterilerPage({ data, onSave, showToast }: MusterilerPr
       teslimatlar: data.teslimatlar.filter(t => t.musteriId !== id),
       musteriOdemeler: data.musteriOdemeler.filter(o => o.musteriId !== id),
     });
+    setSilOnay(null);
     showToast('Müşteri silindi');
   }
 
@@ -195,6 +223,52 @@ export default function MusterilerPage({ data, onSave, showToast }: MusterilerPr
 
   return (
     <div>
+      {/* ── Cascade Silme Onay Modalı ── */}
+      {silOnay && (
+        <div className="modal-overlay open">
+          <div className="modal" style={{ maxWidth: 440 }}>
+            <div className="modal-title" style={{ color: 'var(--red)' }}>⚠️ Müşteriyi Sil</div>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
+              <strong>{silOnay.musteriIsim}</strong> silinirse aşağıdaki tüm kayıtlar <strong>kalıcı olarak silinecektir:</strong>
+            </p>
+            <div style={{ background: 'rgba(184,60,43,0.06)', border: '1px solid rgba(184,60,43,0.18)', borderRadius: 'var(--radius)', padding: '12px 16px', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {silOnay.siparisCount > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  📋 Sipariş: <strong style={{ color: 'var(--red)' }}>{silOnay.siparisCount} kayıt</strong>
+                </div>
+              )}
+              {silOnay.teslimatCount > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  🚛 Teslimat: <strong style={{ color: 'var(--red)' }}>{silOnay.teslimatCount} kayıt</strong>
+                </div>
+              )}
+              {silOnay.odemeCount > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  💰 Ödeme: <strong style={{ color: 'var(--red)' }}>{silOnay.odemeCount} kayıt</strong>
+                </div>
+              )}
+              {silOnay.spotCount > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  ⚡ Spot satış: <strong style={{ color: 'var(--red)' }}>{silOnay.spotCount} kayıt</strong>
+                </div>
+              )}
+            </div>
+            {silOnay.toplamBorc > 0 && (
+              <div style={{ background: 'rgba(184,60,43,0.08)', border: '1px solid rgba(184,60,43,0.25)', borderRadius: 'var(--radius)', padding: '8px 14px', marginBottom: 14, fontSize: 13, color: 'var(--red)', fontFamily: 'JetBrains Mono, monospace' }}>
+                ⚠️ Bu müşterinin <strong>{tl(silOnay.toplamBorc)}</strong> borcu var!
+              </div>
+            )}
+            <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 20 }}>
+              Bu işlem geri alınamaz. Devam etmek istiyor musunuz?
+            </p>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setSilOnay(null)}>İptal</button>
+              <button className="btn btn-danger" onClick={() => musteriSilOnayla(silOnay.musteriId)}>Evet, Kalıcı Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="two-col">
 
         {/* ── Müşteri ekle ── */}
@@ -353,7 +427,7 @@ export default function MusterilerPage({ data, onSave, showToast }: MusterilerPr
                     <td className={`td-mono ${b > 0 ? 'negative' : ''}`}>{b > 0 ? tl(b) : '—'}</td>
                     <td>{son ? fd(son.tarih) : '—'}</td>
                     <td><button className="btn btn-secondary btn-sm" onClick={() => setDetaySec(String(m.id))}>Detay</button></td>
-                    <td><button className="btn btn-danger btn-sm" onClick={() => musteriSil(m.id)}>Sil</button></td>
+                    <td><button className="btn btn-danger btn-sm" onClick={() => musteriSilIste(m.id)}>Sil</button></td>
                   </tr>
                 );
               })}

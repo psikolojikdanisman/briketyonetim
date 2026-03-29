@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import type { AppData } from '@/types';
 import { tl, fd, buHafta, buAy } from '@/lib/storage';
 
@@ -14,103 +14,190 @@ export default function Dashboard({ data }: DashboardProps) {
   const chart5Ref = useRef<HTMLCanvasElement>(null);
   const chartsRef = useRef<Record<string, unknown>>({});
 
-  const today = new Date().toISOString().split('T')[0];
-  const { bas: haftaBas } = buHafta();
-  const { bas: ayBas, bit: ayBit } = buAy();
+  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const { bas: haftaBas } = useMemo(() => buHafta(), []);
+  const { bas: ayBas, bit: ayBit } = useMemo(() => buAy(), []);
 
   // ── Üretim ──────────────────────────────────────────────────────────────
-  const bugunUretim = data.uretimler
-    .filter(u => u.tarih === today)
-    .reduce((s, u) => s + u.miktar, 0);
+  const bugunUretim = useMemo(() =>
+    data.uretimler
+      .filter(u => u.tarih === today)
+      .reduce((s, u) => s + u.miktar, 0),
+    [data.uretimler, today]
+  );
 
-  const haftaUretim = data.uretimler
-    .filter(u => u.tarih >= haftaBas)
-    .reduce((s, u) => s + u.miktar, 0);
+  const haftaUretim = useMemo(() =>
+    data.uretimler
+      .filter(u => u.tarih >= haftaBas)
+      .reduce((s, u) => s + u.miktar, 0),
+    [data.uretimler, haftaBas]
+  );
 
   // ── Satış & Alacak ───────────────────────────────────────────────────────
-  const acikSiparisler = data.siparisler.filter(s => s.gonderilen < s.adet).length;
+  const acikSiparisler = useMemo(() =>
+    data.siparisler.filter(s => s.gonderilen < s.adet).length,
+    [data.siparisler]
+  );
 
-  const toplamAlacak = data.musteriler.reduce((s, m) => {
-    const tT = data.teslimatlar.filter(t => t.musteriId === m.id).reduce((a, t) => a + (t.tutar - t.tahsil), 0);
-    const oT = data.musteriOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
-    const sT = data.spotSatislar.filter(x => x.musteriId === m.id).reduce((a, x) => a + (x.tutar - x.tahsil), 0);
-    const soT = data.spotOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
-    return s + Math.max(0, tT + sT - oT - soT);
-  }, 0);
+  const toplamAlacak = useMemo(() =>
+    data.musteriler.reduce((s, m) => {
+      const tT  = data.teslimatlar.filter(t => t.musteriId === m.id).reduce((a, t) => a + (t.tutar - t.tahsil), 0);
+      const oT  = data.musteriOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
+      const sT  = data.spotSatislar.filter(x => x.musteriId === m.id).reduce((a, x) => a + (x.tutar - x.tahsil), 0);
+      const soT = data.spotOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
+      return s + Math.max(0, tT + sT - oT - soT);
+    }, 0),
+    [data.musteriler, data.teslimatlar, data.musteriOdemeler, data.spotSatislar, data.spotOdemeler]
+  );
 
   // ── Bu ay nakit akışı ────────────────────────────────────────────────────
-  const ayTeslimatGelir = data.teslimatlar
-    .filter(t => t.tarih >= ayBas && t.tarih <= ayBit)
-    .reduce((s, t) => s + t.tutar, 0);
-  const aySpotGelir = data.spotSatislar
-    .filter(s => s.tarih >= ayBas && s.tarih <= ayBit)
-    .reduce((s, x) => s + x.tutar, 0);
-  const ayToplamGelir = ayTeslimatGelir + aySpotGelir;
+  const ayTeslimatGelir = useMemo(() =>
+    data.teslimatlar
+      .filter(t => t.tarih >= ayBas && t.tarih <= ayBit)
+      .reduce((s, t) => s + t.tutar, 0),
+    [data.teslimatlar, ayBas, ayBit]
+  );
 
-  const ayTahsilat = [
+  const aySpotGelir = useMemo(() =>
+    data.spotSatislar
+      .filter(s => s.tarih >= ayBas && s.tarih <= ayBit)
+      .reduce((s, x) => s + x.tutar, 0),
+    [data.spotSatislar, ayBas, ayBit]
+  );
+
+  const ayToplamGelir = useMemo(() =>
+    ayTeslimatGelir + aySpotGelir,
+    [ayTeslimatGelir, aySpotGelir]
+  );
+
+  const ayTahsilat = useMemo(() => [
     ...data.teslimatlar.filter(t => t.tarih >= ayBas && t.tarih <= ayBit).map(t => t.tahsil),
     ...data.musteriOdemeler.filter(o => o.tarih >= ayBas && o.tarih <= ayBit).map(o => o.tutar),
     ...data.spotSatislar.filter(s => s.tarih >= ayBas && s.tarih <= ayBit).map(s => s.tahsil),
     ...data.spotOdemeler.filter(o => o.tarih >= ayBas && o.tarih <= ayBit).map(o => o.tutar),
-  ].reduce((s, x) => s + x, 0);
+  ].reduce((s, x) => s + x, 0),
+    [data.teslimatlar, data.musteriOdemeler, data.spotSatislar, data.spotOdemeler, ayBas, ayBit]
+  );
 
-  const ayIsciOdeme = data.avanslar
-    .filter(a => a.tarih >= ayBas && a.tarih <= ayBit)
-    .reduce((s, a) => s + a.tutar, 0);
+  const ayIsciOdeme = useMemo(() =>
+    data.avanslar
+      .filter(a => a.tarih >= ayBas && a.tarih <= ayBit)
+      .reduce((s, a) => s + a.tutar, 0),
+    [data.avanslar, ayBas, ayBit]
+  );
 
-  const ayMalzemeGider = data.malzemeler
-    .filter(m => m.tarih >= ayBas && m.tarih <= ayBit)
-    .reduce((s, m) => s + m.toplamTutar, 0);
+  const ayMalzemeGider = useMemo(() =>
+    data.malzemeler
+      .filter(m => m.tarih >= ayBas && m.tarih <= ayBit)
+      .reduce((s, m) => s + m.toplamTutar, 0),
+    [data.malzemeler, ayBas, ayBit]
+  );
 
-  const ayDigerGider = (data.giderler || [])
-    .filter(g => g.tarih >= ayBas && g.tarih <= ayBit)
-    .reduce((s, g) => s + g.tutar, 0);
+  const ayDigerGider = useMemo(() =>
+    (data.giderler || [])
+      .filter(g => g.tarih >= ayBas && g.tarih <= ayBit)
+      .reduce((s, g) => s + g.tutar, 0),
+    [data.giderler, ayBas, ayBit]
+  );
 
-  const ayToplamGider = ayIsciOdeme + ayMalzemeGider + ayDigerGider;
-  const ayNetKar = ayTahsilat - ayToplamGider;
+  const ayToplamGider = useMemo(() =>
+    ayIsciOdeme + ayMalzemeGider + ayDigerGider,
+    [ayIsciOdeme, ayMalzemeGider, ayDigerGider]
+  );
+
+  const ayNetKar = useMemo(() =>
+    ayTahsilat - ayToplamGider,
+    [ayTahsilat, ayToplamGider]
+  );
 
   // ── Bu hafta işçi ────────────────────────────────────────────────────────
-  const haftaIsciBorc = data.isciler.reduce((s, i) => {
-    const kazanc =
-      data.uretimler.filter(u => u.tarih >= haftaBas && u.isciler.includes(i.id)).reduce((a, u) => a + u.kisiBasiUcret, 0) +
-      data.yuklemeler.filter(y => y.tarih >= haftaBas && y.isciler.includes(i.id)).reduce((a, y) => a + y.kisiBasiUcret, 0);
-    const odenen = data.avanslar.filter(a => a.isciId === i.id && a.tarih >= haftaBas).reduce((a, x) => a + x.tutar, 0);
-    return s + Math.max(0, kazanc - odenen);
-  }, 0);
+  const haftaIsciBorc = useMemo(() =>
+    data.isciler.reduce((s, i) => {
+      const kazanc =
+        data.uretimler.filter(u => u.tarih >= haftaBas && u.isciler.includes(i.id)).reduce((a, u) => a + u.kisiBasiUcret, 0) +
+        data.yuklemeler.filter(y => y.tarih >= haftaBas && y.isciler.includes(i.id)).reduce((a, y) => a + y.kisiBasiUcret, 0);
+      const odenen = data.avanslar.filter(a => a.isciId === i.id && a.tarih >= haftaBas).reduce((a, x) => a + x.tutar, 0);
+      return s + Math.max(0, kazanc - odenen);
+    }, 0),
+    [data.isciler, data.uretimler, data.yuklemeler, data.avanslar, haftaBas]
+  );
 
   // ── Tedarikçi borcu ──────────────────────────────────────────────────────
-  const tedarikBorc = data.tedarikciListesi
-    .filter(t => t.tur !== 'diger')
-    .map(t => {
-      const alinan = data.malzemeler.filter(m => m.tedarikciId === t.id).reduce((s, m) => s + m.toplamTutar, 0);
-      const odenen = data.tedarikOdemeler.filter(o => o.tedarikciId === t.id).reduce((s, o) => s + o.tutar, 0);
-      return { isim: t.isim, kalan: alinan - odenen };
-    })
-    .filter(t => t.kalan > 0);
+  const tedarikBorc = useMemo(() =>
+    data.tedarikciListesi
+      .filter(t => t.tur !== 'diger')
+      .map(t => {
+        const alinan = data.malzemeler.filter(m => m.tedarikciId === t.id).reduce((s, m) => s + m.toplamTutar, 0);
+        const odenen = data.tedarikOdemeler.filter(o => o.tedarikciId === t.id).reduce((s, o) => s + o.tutar, 0);
+        return { isim: t.isim, kalan: alinan - odenen };
+      })
+      .filter(t => t.kalan > 0),
+    [data.tedarikciListesi, data.malzemeler, data.tedarikOdemeler]
+  );
 
-  const toplamTedarikBorc = tedarikBorc.reduce((s, t) => s + t.kalan, 0);
+  const toplamTedarikBorc = useMemo(() =>
+    tedarikBorc.reduce((s, t) => s + t.kalan, 0),
+    [tedarikBorc]
+  );
 
   // ── Bugün teslimatlar ────────────────────────────────────────────────────
-  const bugunTeslimatlar = data.teslimatlar
-    .filter(t => t.tarih === today)
-    .slice(0, 5);
+  const bugunTeslimatlar = useMemo(() =>
+    data.teslimatlar
+      .filter(t => t.tarih === today)
+      .slice(0, 5),
+    [data.teslimatlar, today]
+  );
 
   // ── Borçlu müşteriler ────────────────────────────────────────────────────
-  const borcluMusteriler = data.musteriler
-    .map(m => {
-      const tT = data.teslimatlar.filter(t => t.musteriId === m.id).reduce((a, t) => a + (t.tutar - t.tahsil), 0);
-      const oT = data.musteriOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
-      const sT = data.spotSatislar.filter(x => x.musteriId === m.id).reduce((a, x) => a + (x.tutar - x.tahsil), 0);
-      const soT = data.spotOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
-      const alacak = Math.max(0, tT + sT - oT - soT);
-      const sonIslem = [...data.teslimatlar]
-        .filter(t => t.musteriId === m.id)
-        .sort((a, b) => b.tarih.localeCompare(a.tarih))[0];
-      return { m, alacak, sonIslem };
-    })
-    .filter(x => x.alacak > 0)
-    .sort((a, b) => b.alacak - a.alacak)
-    .slice(0, 6);
+  const borcluMusteriler = useMemo(() =>
+    data.musteriler
+      .map(m => {
+        const tT  = data.teslimatlar.filter(t => t.musteriId === m.id).reduce((a, t) => a + (t.tutar - t.tahsil), 0);
+        const oT  = data.musteriOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
+        const sT  = data.spotSatislar.filter(x => x.musteriId === m.id).reduce((a, x) => a + (x.tutar - x.tahsil), 0);
+        const soT = data.spotOdemeler.filter(o => o.musteriId === m.id).reduce((a, o) => a + o.tutar, 0);
+        const alacak = Math.max(0, tT + sT - oT - soT);
+        const sonIslem = [...data.teslimatlar]
+          .filter(t => t.musteriId === m.id)
+          .sort((a, b) => b.tarih.localeCompare(a.tarih))[0];
+        return { m, alacak, sonIslem };
+      })
+      .filter(x => x.alacak > 0)
+      .sort((a, b) => b.alacak - a.alacak)
+      .slice(0, 6),
+    [data.musteriler, data.teslimatlar, data.musteriOdemeler, data.spotSatislar, data.spotOdemeler]
+  );
+
+  // ── Stok (üretim − teslimat − spot satış, çeşit bazında) ────────────────
+  const stok = useMemo(() => {
+    const cesitler = ['10luk', '15lik', '20lik'] as const;
+    return cesitler.map(c => {
+      const uretilen  = data.uretimler.filter(u => u.cesit === c).reduce((s, u) => s + u.miktar, 0);
+      const teslimEdilen = data.teslimatlar.filter(t => t.cesit === c).reduce((s, t) => s + t.adet, 0);
+      const spotGiden = data.spotSatislar.filter(x => x.cesit === c).reduce((s, x) => s + x.adet, 0);
+      return { cesit: c, adet: uretilen - teslimEdilen - spotGiden };
+    });
+  }, [data.uretimler, data.teslimatlar, data.spotSatislar]);
+
+  const toplamStok = useMemo(() => stok.reduce((s, x) => s + x.adet, 0), [stok]);
+
+  // ── İşçi tablosu satırları ───────────────────────────────────────────────
+  const isciSatirlar = useMemo(() =>
+    data.isciler.map(i => {
+      const kazanc =
+        data.uretimler
+          .filter(u => u.tarih >= haftaBas && u.isciler.includes(i.id))
+          .reduce((s, u) => s + u.kisiBasiUcret, 0) +
+        data.yuklemeler
+          .filter(y => y.tarih >= haftaBas && y.isciler.includes(i.id))
+          .reduce((s, y) => s + y.kisiBasiUcret, 0);
+      const odenen = data.avanslar
+        .filter(a => a.isciId === i.id && a.tarih >= haftaBas)
+        .reduce((s, a) => s + a.tutar, 0);
+      return { i, kazanc, odenen, kalan: kazanc - odenen };
+    }),
+    [data.isciler, data.uretimler, data.yuklemeler, data.avanslar, haftaBas]
+  );
 
   // ── Grafikler ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -145,7 +232,6 @@ export default function Dashboard({ data }: DashboardProps) {
     return p[2] + '.' + p[1];
   }
 
-  // Grafik renkleri — uygulamanın CSS değişkenleriyle uyumlu
   const C_GREEN       = 'rgba(45,122,79,0.70)';
   const C_GREEN_B     = '#2d7a4f';
   const C_GREEN_LIGHT = 'rgba(58,160,99,0.45)';
@@ -156,18 +242,17 @@ export default function Dashboard({ data }: DashboardProps) {
   const C_PURPLE      = 'rgba(139,92,246,0.55)';
   const C_SLATE       = 'rgba(148,163,184,0.55)';
 
-  // Tooltip ve eksen renkleri — uygulamanın sıcak paletinden
   const tooltipStyle = {
-    backgroundColor: '#2a2118',   // --text
-    titleColor:      '#fdfaf7',   // --surface
-    bodyColor:       '#a0907c',   // --text3
-    borderColor:     '#ddd5c8',   // --border
+    backgroundColor: '#2a2118',
+    titleColor:      '#fdfaf7',
+    bodyColor:       '#a0907c',
+    borderColor:     '#ddd5c8',
     borderWidth:     1,
   };
 
   const axisStyle = {
-    grid:  { color: 'rgba(221,213,200,0.5)' },   // --border hafif
-    ticks: { color: '#a0907c', font: { size: 10 } }, // --text3
+    grid:  { color: 'rgba(221,213,200,0.5)' },
+    ticks: { color: '#a0907c', font: { size: 10 } },
   };
 
   const chartDefaults = {
@@ -196,7 +281,6 @@ export default function Dashboard({ data }: DashboardProps) {
 
     const gunler = dGunler(14);
 
-    // Chart 1 — Üretim
     if (chart1Ref.current) {
       chartsRef.current.c1 = new Chart(chart1Ref.current, {
         type: 'bar',
@@ -217,7 +301,6 @@ export default function Dashboard({ data }: DashboardProps) {
       });
     }
 
-    // Chart 2 — Satış
     if (chart2Ref.current) {
       chartsRef.current.c2 = new Chart(chart2Ref.current, {
         type: 'bar',
@@ -247,7 +330,7 @@ export default function Dashboard({ data }: DashboardProps) {
           plugins: {
             legend: {
               display: true,
-              labels: { color: '#5c4f3d', font: { size: 11 }, boxWidth: 12 }, // --text2
+              labels: { color: '#5c4f3d', font: { size: 11 }, boxWidth: 12 },
             },
             tooltip: tooltipStyle,
           },
@@ -255,7 +338,6 @@ export default function Dashboard({ data }: DashboardProps) {
       });
     }
 
-    // Chart 4 — Aylık Tahsilat vs Satış
     if (chart4Ref.current) {
       const ayAd = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
       const now2 = new Date();
@@ -310,7 +392,6 @@ export default function Dashboard({ data }: DashboardProps) {
       });
     }
 
-    // Chart 5 — Bu ay gider dağılımı (donut)
     if (chart5Ref.current) {
       const ayGiderler = (data.giderler || []).filter(g => g.tarih >= ayBas && g.tarih <= ayBit);
       const katLabels = ['Makine Bakım', 'Kamyon Bakım', 'Mazot', 'İşçi Ödemeleri', 'Malzeme', 'Diğer'];
@@ -351,7 +432,7 @@ export default function Dashboard({ data }: DashboardProps) {
   return (
     <div>
       {/* ── Ana Stat Kartları ── */}
-      <div className="stat-grid">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, marginBottom: 22 }}>
         <div className="stat-card">
           <div className="stat-label">Bugün Üretim</div>
           <div className="stat-value c-accent">{bugunUretim.toLocaleString('tr-TR')}</div>
@@ -371,6 +452,22 @@ export default function Dashboard({ data }: DashboardProps) {
           <div className="stat-label">Müşteri Alacağı</div>
           <div className="stat-value c-red">{Math.round(toplamAlacak).toLocaleString('tr-TR')}</div>
           <div className="stat-sub">TL</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Mevcut Stok</div>
+          <div className={`stat-value ${toplamStok > 0 ? 'c-accent' : 'c-red'}`}>
+            {toplamStok.toLocaleString('tr-TR')}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6 }}>
+            {stok.map(s => (
+              <span key={s.cesit} style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--text3)' }}>
+                {s.cesit}:{' '}
+                <span style={{ color: s.adet > 0 ? 'var(--accent)' : 'var(--red)', fontWeight: 600 }}>
+                  {s.adet.toLocaleString('tr-TR')}
+                </span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -425,7 +522,6 @@ export default function Dashboard({ data }: DashboardProps) {
             </div>
           </div>
 
-          {/* Gider detay satırı */}
           <div style={{
             display: 'flex',
             gap: 8,
@@ -483,29 +579,16 @@ export default function Dashboard({ data }: DashboardProps) {
                 <tr><th>İşçi</th><th>Kazanç</th><th>Ödenen</th><th>Kalan</th></tr>
               </thead>
               <tbody>
-                {data.isciler.length === 0 ? (
+                {isciSatirlar.length === 0 ? (
                   <tr><td colSpan={4} className="empty">İşçi yok</td></tr>
-                ) : data.isciler.map(i => {
-                  const kazanc =
-                    data.uretimler
-                      .filter(u => u.tarih >= haftaBas && u.isciler.includes(i.id))
-                      .reduce((s, u) => s + u.kisiBasiUcret, 0) +
-                    data.yuklemeler
-                      .filter(y => y.tarih >= haftaBas && y.isciler.includes(i.id))
-                      .reduce((s, y) => s + y.kisiBasiUcret, 0);
-                  const odenen = data.avanslar
-                    .filter(a => a.isciId === i.id && a.tarih >= haftaBas)
-                    .reduce((s, a) => s + a.tutar, 0);
-                  const kalan = kazanc - odenen;
-                  return (
-                    <tr key={i.id}>
-                      <td className="td-bold">{i.isim}</td>
-                      <td className="td-mono">{tl(kazanc)}</td>
-                      <td className="td-mono positive">{tl(odenen)}</td>
-                      <td className={`td-mono ${kalan > 0 ? 'positive' : ''}`}>{tl(kalan)}</td>
-                    </tr>
-                  );
-                })}
+                ) : isciSatirlar.map(({ i, kazanc, odenen, kalan }) => (
+                  <tr key={i.id}>
+                    <td className="td-bold">{i.isim}</td>
+                    <td className="td-mono">{tl(kazanc)}</td>
+                    <td className="td-mono positive">{tl(odenen)}</td>
+                    <td className={`td-mono ${kalan > 0 ? 'positive' : ''}`}>{tl(kalan)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

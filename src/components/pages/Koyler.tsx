@@ -16,6 +16,14 @@ export default function KoylerPage({ data, onSave, showToast }: KoylerProps) {
   const [isim, setIsim] = useState('');
   const [notVal, setNotVal] = useState('');
 
+  // ── Cascade silme onay state'i ───────────────────────────────────────────
+  const [silOnay, setSilOnay] = useState<{
+    koyId: number;
+    koyIsim: string;
+    teslimatSayisi: number;
+    spotSayisi: number;
+  } | null>(null);
+
   function ekle() {
     if (bolge !== 'merkez' && !isim.trim()) { showToast('Köy/Bölge adı gerekli', false); return; }
     const yeniIsim = bolge === 'merkez' ? (isim.trim() || 'Merkez') : isim.trim();
@@ -25,18 +33,31 @@ export default function KoylerPage({ data, onSave, showToast }: KoylerProps) {
     showToast('Köy/Bölge eklendi ✓');
   }
 
-  function sil(id: number) {
-    onSave({ ...data, koyler: data.koyler.filter(k => k.id !== id) });
+  function silIste(id: number) {
+    const koy = data.koyler.find(k => k.id === id);
+    if (!koy) return;
+    const teslimatSayisi = data.teslimatlar.filter(t => t.koy === koy.isim).length;
+    const spotSayisi     = data.spotSatislar.filter(s => s.koy === koy.isim).length;
+
+    if (teslimatSayisi > 0 || spotSayisi > 0) {
+      setSilOnay({ koyId: id, koyIsim: koy.isim, teslimatSayisi, spotSayisi });
+    } else {
+      silOnayla(id);
+    }
   }
 
-  // Özet
+  function silOnayla(id: number) {
+    onSave({ ...data, koyler: data.koyler.filter(k => k.id !== id) });
+    setSilOnay(null);
+    showToast('Köy/Bölge silindi');
+  }
+
   const ozet = {
     merkez: data.koyler.filter(k => k.bolge === 'merkez').length,
     yakin: data.koyler.filter(k => k.bolge === 'yakin').length,
     uzak: data.koyler.filter(k => k.bolge === 'uzak').length,
   };
 
-  // Teslimat sayısı
   function teslimatSayisi(koyIsim: string) {
     return data.teslimatlar.filter(t => t.koy === koyIsim).length +
       data.spotSatislar.filter(s => s.koy === koyIsim).length;
@@ -48,6 +69,37 @@ export default function KoylerPage({ data, onSave, showToast }: KoylerProps) {
 
   return (
     <div>
+      {/* ── Cascade Silme Onay Modalı ── */}
+      {silOnay && (
+        <div className="modal-overlay open">
+          <div className="modal" style={{ maxWidth: 400 }}>
+            <div className="modal-title" style={{ color: 'var(--red)' }}>⚠️ Köy / Bölge Sil</div>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
+              <strong>{silOnay.koyIsim}</strong> adlı köye ait işlem kayıtları var:
+            </p>
+            <div style={{ background: 'rgba(184,60,43,0.06)', border: '1px solid rgba(184,60,43,0.18)', borderRadius: 'var(--radius)', padding: '12px 16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {silOnay.teslimatSayisi > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  🚛 Teslimat: <strong style={{ color: 'var(--red)' }}>{silOnay.teslimatSayisi} kayıt</strong>
+                </div>
+              )}
+              {silOnay.spotSayisi > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  ⚡ Spot satış: <strong style={{ color: 'var(--red)' }}>{silOnay.spotSayisi} kayıt</strong>
+                </div>
+              )}
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 20 }}>
+              Köy silinir, ilişkili teslimat ve satış kayıtları <strong>silinmez</strong> — sadece köy adı referanssız kalır.
+            </p>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setSilOnay(null)}>İptal</button>
+              <button className="btn btn-danger" onClick={() => silOnayla(silOnay.koyId)}>Yine de Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="two-col">
         <div className="panel">
           <div className="panel-header"><div className="panel-title">Yeni Köy / Bölge Ekle</div></div>
@@ -138,7 +190,7 @@ export default function KoylerPage({ data, onSave, showToast }: KoylerProps) {
                     <td style={{ color: 'var(--text3)', fontSize: 11 }}>{k.not || '—'}</td>
                     <td className="td-mono">{teslimatSayisi(k.isim)} işlem</td>
                     <td className="td-mono">{teslimatAdet(k.isim).toLocaleString('tr-TR')}</td>
-                    <td><button className="btn btn-danger btn-sm" onClick={() => sil(k.id)}>Sil</button></td>
+                    <td><button className="btn btn-danger btn-sm" onClick={() => silIste(k.id)}>Sil</button></td>
                   </tr>
                 ))
               )}

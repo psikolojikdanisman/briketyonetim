@@ -24,6 +24,15 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
     tumKazanc: number; tumOdenenOncesi: number;
   } | null>(null);
 
+  // ── Cascade silme onay state'i ───────────────────────────────────────────
+  const [silOnay, setSilOnay] = useState<{
+    isciId: number;
+    isciIsim: string;
+    uretimSayisi: number;
+    yuklemeSayisi: number;
+    avansSayisi: number;
+  } | null>(null);
+
   const { bas, bit } = buHafta();
 
   function isciEkle() {
@@ -33,8 +42,23 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
     showToast('İşçi eklendi');
   }
 
-  function isciSil(id: number) {
+  function isciSilIste(id: number) {
+    const isci = data.isciler.find(i => i.id === id);
+    if (!isci) return;
+    const uretimSayisi  = data.uretimler.filter(u => u.isciler.includes(id)).length;
+    const yuklemeSayisi = data.yuklemeler.filter(y => y.isciler.includes(id)).length;
+    const avansSayisi   = data.avanslar.filter(a => a.isciId === id).length;
+
+    if (uretimSayisi > 0 || yuklemeSayisi > 0 || avansSayisi > 0) {
+      setSilOnay({ isciId: id, isciIsim: isci.isim, uretimSayisi, yuklemeSayisi, avansSayisi });
+    } else {
+      isciSilOnayla(id);
+    }
+  }
+
+  function isciSilOnayla(id: number) {
     onSave({ ...data, isciler: data.isciler.filter(i => i.id !== id) });
+    setSilOnay(null);
     showToast('İşçi silindi');
   }
 
@@ -142,6 +166,45 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
 
   return (
     <div>
+      {/* ── Cascade Silme Onay Modalı ── */}
+      {silOnay && (
+        <div className="modal-overlay open">
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-title" style={{ color: 'var(--red)' }}>⚠️ İşçiyi Sil</div>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
+              <strong>{silOnay.isciIsim}</strong> adlı işçinin silinmesi halinde aşağıdaki ilişkili kayıtlar <strong>etkilenecektir:</strong>
+            </p>
+            <div style={{ background: 'rgba(184,60,43,0.06)', border: '1px solid rgba(184,60,43,0.18)', borderRadius: 'var(--radius)', padding: '12px 16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {silOnay.uretimSayisi > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  📦 Üretim kaydı: <strong style={{ color: 'var(--red)' }}>{silOnay.uretimSayisi} kayıt</strong>
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 8 }}>(silinmez, sadece bu işçi çıkarılır)</span>
+                </div>
+              )}
+              {silOnay.yuklemeSayisi > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  🚛 Yükleme kaydı: <strong style={{ color: 'var(--red)' }}>{silOnay.yuklemeSayisi} kayıt</strong>
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 8 }}>(silinmez, sadece bu işçi çıkarılır)</span>
+                </div>
+              )}
+              {silOnay.avansSayisi > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  💰 Ödeme kaydı: <strong style={{ color: 'var(--red)' }}>{silOnay.avansSayisi} kayıt</strong>
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 8 }}>(kalıcı olarak silinir)</span>
+                </div>
+              )}
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 20 }}>
+              İşçi listeden kaldırılır. Ödeme kayıtları silinir. Üretim ve yükleme kayıtlarından bu işçinin adı çıkarılır.
+            </p>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setSilOnay(null)}>İptal</button>
+              <button className="btn btn-danger" onClick={() => isciSilOnayla(silOnay.isciId)}>Evet, Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="two-col">
         <div className="panel">
           <div className="panel-header"><div className="panel-title">İşçi Ekle</div></div>
@@ -252,7 +315,7 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
                     <td className="td-mono">{tl(k.top)}</td>
                     <td className="td-mono positive">{tl(odened)}</td>
                     <td className={`td-mono ${kalan > 0 ? 'positive' : ''}`}>{tl(kalan)}</td>
-                    <td><button className="btn btn-danger btn-sm" onClick={() => isciSil(i.id)}>Sil</button></td>
+                    <td><button className="btn btn-danger btn-sm" onClick={() => isciSilIste(i.id)}>Sil</button></td>
                   </tr>
                 );
               })}

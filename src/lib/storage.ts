@@ -111,9 +111,12 @@ export const fd = (d?: string): string => {
 
 export const today = (): string => new Date().toISOString().split('T')[0];
 
-// UID: çakışma riskini minimize etmek için timestamp * 1000 + random
-export const uid = (): number =>
-  Date.now() * 1000 + Math.floor(Math.random() * 999);
+// UID: crypto.randomUUID() → çakışma riski sıfır
+export const uid = (): number => {
+  const uuid = crypto.randomUUID(); // örn: "110e8400-e29b-41d4-a716-446655440000"
+  // UUID'nin ilk 8 hex karakterini sayıya çevir → yeterince benzersiz, number tipini korur
+  return parseInt(uuid.replace(/-/g, '').slice(0, 12), 16);
+};
 
 export const buHafta = (): { bas: string; bit: string } => {
   const now = new Date();
