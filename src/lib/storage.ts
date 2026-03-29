@@ -59,8 +59,6 @@ export function loadData(): AppData {
     const parsed = JSON.parse(raw);
     const merged: AppData = { ...defaultData, ...parsed };
     if (!merged.yonetici) merged.yonetici = { ...defaultYonetici };
-    // fp migration: eski yapıdan yeni yapıya geç
-    // Eski yapıda '10luk', '15lik', '20lik' gibi anahtarlar olabilir — bunlar FiyatTarifeleri'nde yok
     const fpAsAny = merged.ayarlar.fp as Record<string, unknown>;
     if (!merged.ayarlar.fp || fpAsAny['10luk'] !== undefined) {
       merged.ayarlar.fp = { ...defaultAyarlar.fp };
@@ -89,7 +87,11 @@ export function saveData(data: AppData): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
-    // quota exceeded
+    alert(
+      '⚠️ Kayıt başarısız!\n\n' +
+      'Tarayıcı depolama alanı dolmuş olabilir.\n' +
+      'Ayarlar sayfasından veriyi yedekleyin.'
+    );
   }
 }
 
@@ -109,8 +111,9 @@ export const fd = (d?: string): string => {
 
 export const today = (): string => new Date().toISOString().split('T')[0];
 
+// UID: çakışma riskini minimize etmek için timestamp * 1000 + random
 export const uid = (): number =>
-  Date.now() + Math.floor(Math.random() * 9999);
+  Date.now() * 1000 + Math.floor(Math.random() * 999);
 
 export const buHafta = (): { bas: string; bit: string } => {
   const now = new Date();
