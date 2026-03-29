@@ -13,10 +13,14 @@ const defaultAyarlar: Ayarlar = {
   ucretCimentoIndirme: 0,
   micirFiyat: 0,
   cimentoFiyat: 0,
+  kumFiyat: 0,
   fp: {
-    '10luk': { merkez: 0, yakin: 0 },
-    '15lik': { merkez: 0, yakin: 0 },
-    '20lik': { merkez: 0, yakin: 0 },
+    merkez: 0,
+    yakin: 0,
+    uzak: 0,
+    yerinde: 0,
+    cimento: 0,
+    kum: 0,
   },
 };
 
@@ -55,7 +59,17 @@ export function loadData(): AppData {
     const parsed = JSON.parse(raw);
     const merged: AppData = { ...defaultData, ...parsed };
     if (!merged.yonetici) merged.yonetici = { ...defaultYonetici };
-    if (!merged.ayarlar.fp) merged.ayarlar.fp = defaultAyarlar.fp;
+    // fp migration: eski yapıdan yeni yapıya geç
+    if (!merged.ayarlar.fp || typeof merged.ayarlar.fp['10luk'] !== 'undefined') {
+      merged.ayarlar.fp = defaultAyarlar.fp;
+    }
+    if (merged.ayarlar.fp.merkez === undefined) merged.ayarlar.fp.merkez = 0;
+    if (merged.ayarlar.fp.yakin === undefined) merged.ayarlar.fp.yakin = 0;
+    if (merged.ayarlar.fp.uzak === undefined) merged.ayarlar.fp.uzak = 0;
+    if (merged.ayarlar.fp.yerinde === undefined) merged.ayarlar.fp.yerinde = 0;
+    if (merged.ayarlar.fp.cimento === undefined) merged.ayarlar.fp.cimento = 0;
+    if (merged.ayarlar.fp.kum === undefined) merged.ayarlar.fp.kum = 0;
+    if (merged.ayarlar.kumFiyat === undefined) merged.ayarlar.kumFiyat = 0;
     if (!merged.tedarikOdemeler) merged.tedarikOdemeler = [];
     if (!merged.tedarikciListesi) merged.tedarikciListesi = [];
     if (!merged.koyler) merged.koyler = [];
@@ -180,4 +194,11 @@ export const PAGE_TITLES: Record<string, string> = {
   giderler: 'GİDERLER',
   koyler: 'KÖY / BÖLGE YÖNETİMİ',
   ayarlar: 'AYARLAR',
+};
+
+export const KONUM_LABEL: Record<string, string> = {
+  merkez: 'Merkez',
+  yakin: 'Yakın',
+  uzak: 'Uzak',
+  yerinde: 'Yerinde',
 };

@@ -8,7 +8,7 @@ interface AyarlarProps {
   showToast: (msg: string, ok?: boolean) => void;
 }
 
-type Sekme = 'yonetici' | 'ucretler' | 'fiyatlar';
+type Sekme = 'yonetici' | 'ucretler' | 'fiyatlar' | 'malzeme';
 
 export default function AyarlarPage({ data, onSave, showToast }: AyarlarProps) {
   const [sekme, setSekme] = useState<Sekme>('yonetici');
@@ -35,8 +35,6 @@ export default function AyarlarPage({ data, onSave, showToast }: AyarlarProps) {
   const [ucretDama, setUcretDama] = useState(String(ay.ucretDama));
   const [ucretCimento, setUcretCimento] = useState(String(ay.ucretCimento));
   const [ucretCimentoIndirme, setUcretCimentoIndirme] = useState(String(ay.ucretCimentoIndirme));
-  const [micirFiyat, setMicirFiyat] = useState(String(ay.micirFiyat));
-  const [cimentoFiyat, setCimentoFiyat] = useState(String(ay.cimentoFiyat));
 
   function ucretKaydet() {
     const yeniAyarlar: Ayarlar = {
@@ -49,8 +47,6 @@ export default function AyarlarPage({ data, onSave, showToast }: AyarlarProps) {
       ucretDama: parseFloat(ucretDama) || 0,
       ucretCimento: parseFloat(ucretCimento) || 0,
       ucretCimentoIndirme: parseFloat(ucretCimentoIndirme) || 0,
-      micirFiyat: parseFloat(micirFiyat) || 0,
-      cimentoFiyat: parseFloat(cimentoFiyat) || 0,
     };
     onSave({ ...data, ayarlar: yeniAyarlar });
     showToast('Ücret tarifeleri kaydedildi ✓');
@@ -58,21 +54,42 @@ export default function AyarlarPage({ data, onSave, showToast }: AyarlarProps) {
 
   // ─── Satış fiyatları formu ────────────────────────────────────────────────
   const fp = ay.fp;
-  const [fp10m, setFp10m] = useState(String(fp['10luk'].merkez));
-  const [fp10y, setFp10y] = useState(String(fp['10luk'].yakin));
-  const [fp15m, setFp15m] = useState(String(fp['15lik'].merkez));
-  const [fp15y, setFp15y] = useState(String(fp['15lik'].yakin));
-  const [fp20m, setFp20m] = useState(String(fp['20lik'].merkez));
-  const [fp20y, setFp20y] = useState(String(fp['20lik'].yakin));
+  const [fpMerkez, setFpMerkez] = useState(String(fp.merkez ?? 0));
+  const [fpYakin, setFpYakin] = useState(String(fp.yakin ?? 0));
+  const [fpUzak, setFpUzak] = useState(String(fp.uzak ?? 0));
+  const [fpYerinde, setFpYerinde] = useState(String(fp.yerinde ?? 0));
+  const [fpCimento, setFpCimento] = useState(String(fp.cimento ?? 0));
+  const [fpKum, setFpKum] = useState(String(fp.kum ?? 0));
 
   function fiyatKaydet() {
     const yeniFp = {
-      '10luk': { merkez: parseFloat(fp10m) || 0, yakin: parseFloat(fp10y) || 0 },
-      '15lik': { merkez: parseFloat(fp15m) || 0, yakin: parseFloat(fp15y) || 0 },
-      '20lik': { merkez: parseFloat(fp20m) || 0, yakin: parseFloat(fp20y) || 0 },
+      merkez: parseFloat(fpMerkez) || 0,
+      yakin: parseFloat(fpYakin) || 0,
+      uzak: parseFloat(fpUzak) || 0,
+      yerinde: parseFloat(fpYerinde) || 0,
+      cimento: parseFloat(fpCimento) || 0,
+      kum: parseFloat(fpKum) || 0,
     };
     onSave({ ...data, ayarlar: { ...ay, fp: yeniFp } });
     showToast('Satış fiyatları kaydedildi ✓');
+  }
+
+  // ─── Malzeme alış fiyatları formu ─────────────────────────────────────────
+  const [micirFiyat, setMicirFiyat] = useState(String(ay.micirFiyat));
+  const [cimentoFiyat, setCimentoFiyat] = useState(String(ay.cimentoFiyat));
+  const [kumFiyat, setKumFiyat] = useState(String(ay.kumFiyat ?? 0));
+
+  function malzemeKaydet() {
+    onSave({
+      ...data,
+      ayarlar: {
+        ...ay,
+        micirFiyat: parseFloat(micirFiyat) || 0,
+        cimentoFiyat: parseFloat(cimentoFiyat) || 0,
+        kumFiyat: parseFloat(kumFiyat) || 0,
+      },
+    });
+    showToast('Malzeme alış fiyatları kaydedildi ✓');
   }
 
   // ─── Sekme butonları ──────────────────────────────────────────────────────
@@ -80,14 +97,13 @@ export default function AyarlarPage({ data, onSave, showToast }: AyarlarProps) {
     { key: 'yonetici', label: 'Yönetici Bilgileri', icon: '👤' },
     { key: 'ucretler', label: 'İşçi Ücret Tarifeleri', icon: '👷' },
     { key: 'fiyatlar', label: 'Satış Fiyatları', icon: '💰' },
+    { key: 'malzeme', label: 'Malzeme Alış Fiyatları', icon: '🧱' },
   ];
 
   return (
     <div>
       {/* Sekme çubuğu */}
-      <div style={{
-        display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap',
-      }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         {sekmeler.map(s => (
           <button
             key={s.key}
@@ -110,72 +126,39 @@ export default function AyarlarPage({ data, onSave, showToast }: AyarlarProps) {
             <div className="warn-box" style={{ marginBottom: 16 }}>
               Bu bilgiler makbuzlarda otomatik olarak kullanılır.
             </div>
-
             <div className="frow c2">
               <div>
                 <label>Ad</label>
-                <input
-                  type="text"
-                  placeholder="Örn: Ahmet"
-                  value={yon.ad}
-                  onChange={e => setYon(y => ({ ...y, ad: e.target.value }))}
-                />
+                <input type="text" placeholder="Örn: Ahmet" value={yon.ad} onChange={e => setYon(y => ({ ...y, ad: e.target.value }))} />
               </div>
               <div>
                 <label>Soyad</label>
-                <input
-                  type="text"
-                  placeholder="Örn: Yılmaz"
-                  value={yon.soyad}
-                  onChange={e => setYon(y => ({ ...y, soyad: e.target.value }))}
-                />
+                <input type="text" placeholder="Örn: Yılmaz" value={yon.soyad} onChange={e => setYon(y => ({ ...y, soyad: e.target.value }))} />
               </div>
             </div>
-
             <div className="frow">
               <div>
                 <label>Telefon</label>
-                <input
-                  type="tel"
-                  placeholder="Örn: 0532 123 45 67"
-                  value={yon.tel}
-                  onChange={e => setYon(y => ({ ...y, tel: e.target.value }))}
-                />
+                <input type="tel" placeholder="Örn: 0532 123 45 67" value={yon.tel} onChange={e => setYon(y => ({ ...y, tel: e.target.value }))} />
               </div>
             </div>
-
-            {/* Önizleme */}
             {(yon.ad || yon.soyad || yon.tel) && (
-              <div style={{
-                background: 'var(--surface2)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: '12px 16px',
-                marginBottom: 16,
-                fontSize: 13,
-              }}>
+              <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
                 <div style={{ fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginBottom: 6, fontFamily: 'JetBrains Mono, monospace' }}>
                   MAKBUZLARDA GÖRÜNECEK
                 </div>
-                <div style={{ fontWeight: 600, color: 'var(--text)' }}>
-                  İdooğlu Briket
-                </div>
+                <div style={{ fontWeight: 600, color: 'var(--text)' }}>İdooğlu Briket</div>
                 {(yon.ad || yon.soyad) && (
                   <div style={{ color: 'var(--text2)', fontSize: 12, marginTop: 2 }}>
                     {[yon.ad, yon.soyad].filter(Boolean).join(' ')}
                   </div>
                 )}
                 {yon.tel && (
-                  <div style={{ color: 'var(--text2)', fontSize: 12, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>
-                    {yon.tel}
-                  </div>
+                  <div style={{ color: 'var(--text2)', fontSize: 12, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{yon.tel}</div>
                 )}
               </div>
             )}
-
-            <button className="btn btn-primary" onClick={yoneticiKaydet}>
-              ✓ Kaydet
-            </button>
+            <button className="btn btn-primary" onClick={yoneticiKaydet}>✓ Kaydet</button>
           </div>
         </div>
       )}
@@ -235,24 +218,6 @@ export default function AyarlarPage({ data, onSave, showToast }: AyarlarProps) {
             </div>
           </div>
 
-          <div className="panel" style={{ maxWidth: 560 }}>
-            <div className="panel-header">
-              <div className="panel-title">Malzeme Alış Fiyatları (ton başı ₺)</div>
-            </div>
-            <div className="panel-body">
-              <div className="frow c2">
-                <div>
-                  <label>Mıcır Fiyatı</label>
-                  <input type="number" step="0.01" value={micirFiyat} onChange={e => setMicirFiyat(e.target.value)} />
-                </div>
-                <div>
-                  <label>Çimento Fiyatı (torba)</label>
-                  <input type="number" step="0.01" value={cimentoFiyat} onChange={e => setCimentoFiyat(e.target.value)} />
-                </div>
-              </div>
-            </div>
-          </div>
-
           <button className="btn btn-primary" onClick={ucretKaydet}>✓ Ücretleri Kaydet</button>
         </div>
       )}
@@ -261,39 +226,79 @@ export default function AyarlarPage({ data, onSave, showToast }: AyarlarProps) {
       {sekme === 'fiyatlar' && (
         <div className="panel" style={{ maxWidth: 560 }}>
           <div className="panel-header">
-            <div className="panel-title">Satış Fiyat Tarifeleri (adet başı ₺)</div>
+            <div className="panel-title">Satış Fiyat Tarifeleri</div>
           </div>
           <div className="panel-body">
-            <div className="warn-box">
-              Merkez: yakın mesafe köyler · Yakın: orta mesafe köyler
+            <div className="warn-box" style={{ marginBottom: 16 }}>
+              Briket fiyatları tür fark etmeksizin konuma göre belirlenir. Spot satışta seçilen konuma göre fiyat otomatik gelir.
             </div>
 
-            {(['10luk', '15lik', '20lik'] as const).map(cesit => {
-              const labels: Record<string, string> = { '10luk': "10'luk", '15lik': "15'lik", '20lik': "20'lik" };
-              const vals = {
-                '10luk': { m: fp10m, setM: setFp10m, y: fp10y, setY: setFp10y },
-                '15lik': { m: fp15m, setM: setFp15m, y: fp15y, setY: setFp15y },
-                '20lik': { m: fp20m, setM: setFp20m, y: fp20y, setY: setFp20y },
-              }[cesit];
-              return (
-                <div key={cesit} style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 8, fontFamily: 'JetBrains Mono, monospace' }}>
-                    Briket {labels[cesit]}
-                  </div>
-                  <div className="frow c2" style={{ marginBottom: 0 }}>
-                    <div>
-                      <label>Merkez</label>
-                      <input type="number" step="0.01" value={vals.m} onChange={e => vals.setM(e.target.value)} />
-                    </div>
-                    <div>
-                      <label>Yakın</label>
-                      <input type="number" step="0.01" value={vals.y} onChange={e => vals.setY(e.target.value)} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            <button className="btn btn-primary" onClick={fiyatKaydet}>✓ Fiyatları Kaydet</button>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 10, fontFamily: 'JetBrains Mono, monospace' }}>
+              BRİKET SATIŞ FİYATLARI (adet başı ₺)
+            </div>
+            <div className="frow c2" style={{ marginBottom: 20 }}>
+              <div>
+                <label>Yerinde (fabrikadan alıyor)</label>
+                <input type="number" step="0.01" value={fpYerinde} onChange={e => setFpYerinde(e.target.value)} />
+              </div>
+              <div>
+                <label>Merkez</label>
+                <input type="number" step="0.01" value={fpMerkez} onChange={e => setFpMerkez(e.target.value)} />
+              </div>
+              <div>
+                <label>Yakın</label>
+                <input type="number" step="0.01" value={fpYakin} onChange={e => setFpYakin(e.target.value)} />
+              </div>
+              <div>
+                <label>Uzak</label>
+                <input type="number" step="0.01" value={fpUzak} onChange={e => setFpUzak(e.target.value)} />
+              </div>
+            </div>
+
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 10, fontFamily: 'JetBrains Mono, monospace' }}>
+              DİĞER ÜRÜN SATIŞ FİYATLARI
+            </div>
+            <div className="frow c2">
+              <div>
+                <label>Çimento (torba başı ₺)</label>
+                <input type="number" step="0.01" value={fpCimento} onChange={e => setFpCimento(e.target.value)} />
+              </div>
+              <div>
+                <label>Kum (ton başı ₺)</label>
+                <input type="number" step="0.01" value={fpKum} onChange={e => setFpKum(e.target.value)} />
+              </div>
+            </div>
+
+            <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={fiyatKaydet}>✓ Fiyatları Kaydet</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── MALZEME ALIŞ FİYATLARI ── */}
+      {sekme === 'malzeme' && (
+        <div className="panel" style={{ maxWidth: 480 }}>
+          <div className="panel-header">
+            <div className="panel-title">🧱 Malzeme Alış Fiyatları</div>
+          </div>
+          <div className="panel-body">
+            <div className="warn-box" style={{ marginBottom: 16 }}>
+              Bu fiyatlar malzeme girişlerinde varsayılan olarak kullanılır.
+            </div>
+            <div className="frow c2">
+              <div>
+                <label>Mıcır Fiyatı (ton başı ₺)</label>
+                <input type="number" step="0.01" value={micirFiyat} onChange={e => setMicirFiyat(e.target.value)} />
+              </div>
+              <div>
+                <label>Çimento Fiyatı (torba başı ₺)</label>
+                <input type="number" step="0.01" value={cimentoFiyat} onChange={e => setCimentoFiyat(e.target.value)} />
+              </div>
+              <div>
+                <label>Kum Fiyatı (ton başı ₺)</label>
+                <input type="number" step="0.01" value={kumFiyat} onChange={e => setKumFiyat(e.target.value)} />
+              </div>
+            </div>
+            <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={malzemeKaydet}>✓ Kaydet</button>
           </div>
         </div>
       )}

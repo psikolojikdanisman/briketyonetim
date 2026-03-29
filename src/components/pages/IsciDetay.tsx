@@ -268,6 +268,7 @@ export default function IsciDetay({ data, onSave, showToast, isciId, onGeri }: I
   function odemeKaydet() {
     const tutar = parseFloat(avTutar);
     if (!tutar) { showToast('Tutar gerekli', false); return; }
+    if (!isci) { showToast('İşçi bulunamadı', false); return; }
     const makbuzNo = `IP-${Date.now().toString(36).toUpperCase().slice(-6)}`;
     onSave({
       ...data,

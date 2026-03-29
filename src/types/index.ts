@@ -132,7 +132,7 @@ export interface Tedarikci {
 export interface Koy {
   id: number;
   isim: string;
-  bolge: 'merkez' | 'yakin' | 'uzak';
+  bolge: 'merkez' | 'yakin' | 'uzak' | 'yerinde';
   not?: string;
 }
 
@@ -145,6 +145,7 @@ export interface SpotSatis {
   birimFiyat: number;
   tutar: number;
   tahsil: number;
+  konum?: 'merkez' | 'yakin' | 'uzak' | 'yerinde';
   koy?: string;
   adres?: string;
   bolge?: string;
@@ -176,9 +177,12 @@ export interface Gider {
 }
 
 export interface FiyatTarifeleri {
-  '10luk': { merkez: number; yakin: number };
-  '15lik': { merkez: number; yakin: number };
-  '20lik': { merkez: number; yakin: number };
+  merkez: number;
+  yakin: number;
+  uzak: number;
+  yerinde: number;
+  cimento: number;
+  kum: number;
 }
 
 export interface Ayarlar {
@@ -192,6 +196,7 @@ export interface Ayarlar {
   ucretCimentoIndirme: number;
   micirFiyat: number;
   cimentoFiyat: number;
+  kumFiyat: number;
   fp: FiyatTarifeleri;
 }
 
