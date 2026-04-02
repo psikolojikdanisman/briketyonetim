@@ -5,6 +5,8 @@ import {
   tl, fd, today, uid, buHafta,
   isciKazancAralik, isciToplamKazanc,
   isciOdenenAralik, isciToplamOdenen,
+  saveIsci, deleteIsci, saveAvans, deleteAvans,
+  saveUretim, saveYukleme,
 } from '@/lib/storage';
 import { makbuzIndir } from '@/lib/pdfMakbuz';
 
@@ -16,39 +18,36 @@ interface IscilerProps {
 }
 
 export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: IscilerProps) {
-  const [isim, setIsim]           = useState('');
-  const [avIsci, setAvIsci]       = useState('');
-  const [avTutar, setAvTutar]     = useState('');
-  const [avTarih, setAvTarih]     = useState(today());
+  const [isim, setIsim]             = useState('');
+  const [avIsci, setAvIsci]         = useState('');
+  const [avTutar, setAvTutar]       = useState('');
+  const [avTarih, setAvTarih]       = useState(today());
   const [avAciklama, setAvAciklama] = useState('');
   const [sonOdeme, setSonOdeme] = useState<{
-    isciId: number; isciIsim: string;
-    tutar: number; tarih: string; aciklama: string; no: string;
-    haftaKazanc: number; haftaOdenenOncesi: number;
-    tumKazanc: number; tumOdenenOncesi: number;
+    isciId: number; isciIsim: string; tutar: number; tarih: string; aciklama: string; no: string;
+    haftaKazanc: number; haftaOdenenOncesi: number; tumKazanc: number; tumOdenenOncesi: number;
   } | null>(null);
-
   const [silOnay, setSilOnay] = useState<{
-    isciId: number; isciIsim: string;
-    uretimSayisi: number; yuklemeSayisi: number; avansSayisi: number;
+    isciId: number; isciIsim: string; uretimSayisi: number; yuklemeSayisi: number; avansSayisi: number;
   } | null>(null);
 
   const { bas, bit } = buHafta();
 
-  function isciEkle() {
+  async function isciEkle() {
     if (!isim.trim()) { showToast('İsim gerekli', false); return; }
-    onSave({ ...data, isciler: [...data.isciler, { id: uid(), isim: isim.trim() }] });
+    const yeni = { id: uid(), isim: isim.trim() };
+    onSave({ ...data, isciler: [...data.isciler, yeni] });
+    await saveIsci(yeni);
     setIsim('');
     showToast('İşçi eklendi');
   }
 
   function isciSilIste(id: number) {
-    const isci = data.isciler.find((i) => i.id === id);
+    const isci = data.isciler.find(i => i.id === id);
     if (!isci) return;
-    const uretimSayisi  = data.uretimler.filter((u) => u.isciler.includes(id)).length;
-    const yuklemeSayisi = data.yuklemeler.filter((y) => y.isciler.includes(id)).length;
-    const avansSayisi   = data.avanslar.filter((a) => a.isciId === id).length;
-
+    const uretimSayisi  = data.uretimler.filter(u => u.isciler.includes(id)).length;
+    const yuklemeSayisi = data.yuklemeler.filter(y => y.isciler.includes(id)).length;
+    const avansSayisi   = data.avanslar.filter(a => a.isciId === id).length;
     if (uretimSayisi > 0 || yuklemeSayisi > 0 || avansSayisi > 0) {
       setSilOnay({ isciId: id, isciIsim: isci.isim, uretimSayisi, yuklemeSayisi, avansSayisi });
     } else {
@@ -56,96 +55,61 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
     }
   }
 
-  function isciSilOnayla(id: number) {
-    onSave({
-      ...data,
-      isciler: data.isciler.filter((i) => i.id !== id),
-      // Avanslar kalıcı siliniyor
-      avanslar: data.avanslar.filter((a) => a.isciId !== id),
-      // Üretim + yükleme kayıtlarından işçi çıkarılıyor (kayıtlar silinmiyor)
-      uretimler: data.uretimler.map((u) =>
-        u.isciler.includes(id)
-          ? { ...u, isciler: u.isciler.filter((x) => x !== id) }
-          : u
-      ),
-      yuklemeler: data.yuklemeler.map((y) =>
-        y.isciler.includes(id)
-          ? { ...y, isciler: y.isciler.filter((x) => x !== id) }
-          : y
-      ),
-    });
+  async function isciSilOnayla(id: number) {
+    const yeniUretimler  = data.uretimler.map(u => u.isciler.includes(id) ? { ...u, isciler: u.isciler.filter(x => x !== id) } : u);
+    const yeniYuklemeler = data.yuklemeler.map(y => y.isciler.includes(id) ? { ...y, isciler: y.isciler.filter(x => x !== id) } : y);
+    const silinecekAvanslar = data.avanslar.filter(a => a.isciId === id);
+
+    onSave({ ...data, isciler: data.isciler.filter(i => i.id !== id), avanslar: data.avanslar.filter(a => a.isciId !== id), uretimler: yeniUretimler, yuklemeler: yeniYuklemeler });
+
+    await deleteIsci(id);
+    await Promise.all(silinecekAvanslar.map(a => deleteAvans(a.id)));
+    await Promise.all(yeniUretimler.filter(u => u.isciler !== data.uretimler.find(x => x.id === u.id)?.isciler).map(saveUretim));
+    await Promise.all(yeniYuklemeler.filter(y => y.isciler !== data.yuklemeler.find(x => x.id === y.id)?.isciler).map(saveYukleme));
+
     setSilOnay(null);
     showToast('İşçi silindi');
   }
 
   const isciKazanc = (isciId: number) => isciKazancAralik(isciId, bas, bit, data);
   const isciOdenen = (isciId: number) => isciOdenenAralik(isciId, bas, bit, data);
-
-  function isciKalan(isciId: number) {
-    return isciToplamKazanc(isciId, data).top - isciToplamOdenen(isciId, data);
-  }
+  function isciKalan(isciId: number) { return isciToplamKazanc(isciId, data).top - isciToplamOdenen(isciId, data); }
 
   function handleIsciSec(val: string) {
-    setAvIsci(val);
-    setSonOdeme(null);
-    if (val) {
-      const kalan = isciKalan(parseInt(val));
-      setAvTutar(kalan > 0 ? String(kalan) : '');
-    } else {
-      setAvTutar('');
-    }
+    setAvIsci(val); setSonOdeme(null);
+    if (val) { const kalan = isciKalan(parseInt(val)); setAvTutar(kalan > 0 ? String(kalan) : ''); }
+    else setAvTutar('');
   }
 
-  function avansKaydet() {
+  async function avansKaydet() {
     const id    = parseInt(avIsci);
     const tutar = parseFloat(avTutar);
     if (!id || !tutar) { showToast('İşçi ve tutar gerekli', false); return; }
-    const isci    = data.isciler.find((i) => i.id === id);
+    const isci    = data.isciler.find(i => i.id === id);
     const makbuzNo = `IP-${Date.now().toString(36).toUpperCase().slice(-6)}`;
-
-    const hk = isciKazanc(id);
-    const ho = isciOdenen(id);
-    const tk = isciToplamKazanc(id, data);
-    const to = isciToplamOdenen(id, data);
-
-    onSave({
-      ...data,
-      avanslar: [...data.avanslar, { id: uid(), isciId: id, tutar, tarih: avTarih || today(), aciklama: avAciklama }],
-    });
-    setSonOdeme({
-      isciId: id,
-      isciIsim: isci?.isim || '?',
-      tutar,
-      tarih: avTarih || today(),
-      aciklama: avAciklama,
-      no: makbuzNo,
-      haftaKazanc: hk.top,
-      haftaOdenenOncesi: ho,
-      tumKazanc: tk.top,
-      tumOdenenOncesi: to,
-    });
+    const hk = isciKazanc(id); const ho = isciOdenen(id);
+    const tk = isciToplamKazanc(id, data); const to = isciToplamOdenen(id, data);
+    const yeniAvans = { id: uid(), isciId: id, tutar, tarih: avTarih || today(), aciklama: avAciklama };
+    onSave({ ...data, avanslar: [...data.avanslar, yeniAvans] });
+    await saveAvans(yeniAvans);
+    setSonOdeme({ isciId: id, isciIsim: isci?.isim || '?', tutar, tarih: avTarih || today(), aciklama: avAciklama, no: makbuzNo, haftaKazanc: hk.top, haftaOdenenOncesi: ho, tumKazanc: tk.top, tumOdenenOncesi: to });
     setAvTutar(''); setAvAciklama('');
     showToast('Ödeme kaydedildi ✓');
   }
 
   function isciMakbuzAc() {
     if (!sonOdeme) return;
-    const kalanSonra = Math.max(0, sonOdeme.tumKazanc - sonOdeme.tumOdenenOncesi - sonOdeme.tutar);
-    const haftaKalan = Math.max(0, sonOdeme.haftaKazanc - sonOdeme.haftaOdenenOncesi - sonOdeme.tutar);
+    const kalanSonra  = Math.max(0, sonOdeme.tumKazanc - sonOdeme.tumOdenenOncesi - sonOdeme.tutar);
+    const haftaKalan  = Math.max(0, sonOdeme.haftaKazanc - sonOdeme.haftaOdenenOncesi - sonOdeme.tutar);
     makbuzIndir({
-      baslik: 'ISCI ODEME MAKBUZU',
-      makbuzNo: sonOdeme.no,
-      tarih: sonOdeme.tarih,
-      alici: sonOdeme.isciIsim,
-      aciklama: sonOdeme.aciklama || undefined,
+      baslik: 'ISCI ODEME MAKBUZU', makbuzNo: sonOdeme.no, tarih: sonOdeme.tarih,
+      alici: sonOdeme.isciIsim, aciklama: sonOdeme.aciklama || undefined,
       kalemler: [
-        { etiket: 'Odeme Tarihi',                    deger: sonOdeme.tarih.split('-').reverse().join('.') },
-        { etiket: 'Bu Hafta Toplam Kazanc',          deger: tl(sonOdeme.haftaKazanc) },
-        { etiket: 'Bu Hafta Onceki Odemeler',        deger: tl(sonOdeme.haftaOdenenOncesi) },
+        { etiket: 'Bu Hafta Toplam Kazanc', deger: tl(sonOdeme.haftaKazanc) },
+        { etiket: 'Bu Hafta Onceki Odemeler', deger: tl(sonOdeme.haftaOdenenOncesi) },
         { etiket: 'Bu Hafta Kalan (Bu Odeme Sonrasi)', deger: tl(haftaKalan) },
-        { etiket: 'Tum Zamanlar Kazanc',             deger: tl(sonOdeme.tumKazanc) },
-        { etiket: 'Tum Zamanlar Odenen',             deger: tl(sonOdeme.tumOdenenOncesi) },
-        ...(sonOdeme.aciklama ? [{ etiket: 'Aciklama', deger: sonOdeme.aciklama }] : []),
+        { etiket: 'Tum Zamanlar Kazanc', deger: tl(sonOdeme.tumKazanc) },
+        { etiket: 'Tum Zamanlar Odenen', deger: tl(sonOdeme.tumOdenenOncesi) },
       ],
       odemeTutari: tl(sonOdeme.tutar),
       kalanBorc: kalanSonra > 0 ? tl(kalanSonra) : undefined,
@@ -153,48 +117,24 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
     });
   }
 
-  function avSil(id: number) {
-    onSave({ ...data, avanslar: data.avanslar.filter((a) => a.id !== id) });
+  async function avSil(id: number) {
+    onSave({ ...data, avanslar: data.avanslar.filter(a => a.id !== id) });
+    await deleteAvans(id);
   }
 
-  const isimStyle: React.CSSProperties = {
-    cursor: 'pointer',
-    color: 'var(--accent)',
-    fontWeight: 600,
-    textDecoration: 'underline',
-    textDecorationStyle: 'dotted',
-    textUnderlineOffset: 3,
-  };
+  const isimStyle: React.CSSProperties = { cursor: 'pointer', color: 'var(--accent)', fontWeight: 600, textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 };
 
   return (
     <div>
-      {/* ── Cascade Silme Onay Modalı ── */}
       {silOnay && (
         <div className="modal-overlay open">
           <div className="modal" style={{ maxWidth: 420 }}>
             <div className="modal-title" style={{ color: 'var(--red)' }}>⚠️ İşçiyi Sil</div>
-            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
-              <strong>{silOnay.isciIsim}</strong> adlı işçinin silinmesi halinde aşağıdaki kayıtlar etkilenecektir:
-            </p>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}><strong>{silOnay.isciIsim}</strong> adlı işçinin silinmesi halinde aşağıdaki kayıtlar etkilenecektir:</p>
             <div style={{ background: 'rgba(184,60,43,0.06)', border: '1px solid rgba(184,60,43,0.18)', borderRadius: 'var(--radius)', padding: '12px 16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {silOnay.uretimSayisi > 0 && (
-                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
-                  📦 Üretim kaydı: <strong style={{ color: 'var(--red)' }}>{silOnay.uretimSayisi} kayıt</strong>
-                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 8 }}>(silinmez, bu işçi çıkarılır)</span>
-                </div>
-              )}
-              {silOnay.yuklemeSayisi > 0 && (
-                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
-                  🚛 Yükleme kaydı: <strong style={{ color: 'var(--red)' }}>{silOnay.yuklemeSayisi} kayıt</strong>
-                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 8 }}>(silinmez, bu işçi çıkarılır)</span>
-                </div>
-              )}
-              {silOnay.avansSayisi > 0 && (
-                <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
-                  💰 Ödeme kaydı: <strong style={{ color: 'var(--red)' }}>{silOnay.avansSayisi} kayıt</strong>
-                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 8 }}>(kalıcı olarak silinir)</span>
-                </div>
-              )}
+              {silOnay.uretimSayisi > 0 && <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>📦 Üretim: <strong style={{ color: 'var(--red)' }}>{silOnay.uretimSayisi}</strong> <span style={{ fontSize: 11, color: 'var(--text3)' }}>(kayıt silinmez, işçi çıkarılır)</span></div>}
+              {silOnay.yuklemeSayisi > 0 && <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>🚛 Yükleme: <strong style={{ color: 'var(--red)' }}>{silOnay.yuklemeSayisi}</strong> <span style={{ fontSize: 11, color: 'var(--text3)' }}>(kayıt silinmez, işçi çıkarılır)</span></div>}
+              {silOnay.avansSayisi > 0 && <div style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>💰 Ödeme: <strong style={{ color: 'var(--red)' }}>{silOnay.avansSayisi}</strong> <span style={{ fontSize: 11, color: 'var(--text3)' }}>(kalıcı olarak silinir)</span></div>}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setSilOnay(null)}>İptal</button>
@@ -208,18 +148,7 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
         <div className="panel">
           <div className="panel-header"><div className="panel-title">İşçi Ekle</div></div>
           <div className="panel-body">
-            <div className="frow">
-              <div>
-                <label>Ad Soyad</label>
-                <input
-                  type="text"
-                  placeholder="İşçi adı"
-                  value={isim}
-                  onChange={(e) => setIsim(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && isciEkle()}
-                />
-              </div>
-            </div>
+            <div className="frow"><div><label>Ad Soyad</label><input type="text" placeholder="İşçi adı" value={isim} onChange={e => setIsim(e.target.value)} onKeyDown={e => e.key === 'Enter' && isciEkle()} /></div></div>
             <button className="btn btn-primary" onClick={isciEkle}>+ Ekle</button>
           </div>
         </div>
@@ -230,48 +159,26 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
             <div className="frow c2">
               <div>
                 <label>İşçi</label>
-                <select value={avIsci} onChange={(e) => handleIsciSec(e.target.value)}>
+                <select value={avIsci} onChange={e => handleIsciSec(e.target.value)}>
                   <option value="">— Seç —</option>
-                  {data.isciler.map((i) => (
-                    <option key={i.id} value={i.id}>{i.isim}</option>
-                  ))}
+                  {data.isciler.map(i => <option key={i.id} value={i.id}>{i.isim}</option>)}
                 </select>
               </div>
-              <div>
-                <label>Tutar (TL)</label>
-                <input type="number" placeholder="0.00" value={avTutar} onChange={(e) => setAvTutar(e.target.value)} />
-              </div>
+              <div><label>Tutar (TL)</label><input type="number" placeholder="0.00" value={avTutar} onChange={e => setAvTutar(e.target.value)} /></div>
             </div>
-
-            {avIsci && (() => {
-              const kalan = isciKalan(parseInt(avIsci));
-              return kalan > 0 ? (
-                <div style={{ background: 'rgba(46,196,182,.07)', border: '1px solid rgba(46,196,182,.25)', borderRadius: 'var(--radius)', padding: '7px 12px', marginBottom: 4, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', color: 'var(--text2)' }}>
-                  Kalan alacak: <span style={{ color: 'var(--success)', fontWeight: 700 }}>{tl(kalan)}</span>
-                </div>
-              ) : null;
-            })()}
-
+            {avIsci && (() => { const kalan = isciKalan(parseInt(avIsci)); return kalan > 0 ? (
+              <div style={{ background: 'rgba(46,196,182,.07)', border: '1px solid rgba(46,196,182,.25)', borderRadius: 'var(--radius)', padding: '7px 12px', marginBottom: 4, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', color: 'var(--text2)' }}>
+                Kalan alacak: <span style={{ color: 'var(--success)', fontWeight: 700 }}>{tl(kalan)}</span>
+              </div>
+            ) : null; })()}
             <div className="frow c2">
-              <div>
-                <label>Tarih</label>
-                <input type="date" value={avTarih} onChange={(e) => setAvTarih(e.target.value)} />
-              </div>
-              <div>
-                <label>Açıklama</label>
-                <input type="text" placeholder="ör: bu haftanın ödemesi" value={avAciklama} onChange={(e) => setAvAciklama(e.target.value)} />
-              </div>
+              <div><label>Tarih</label><input type="date" value={avTarih} onChange={e => setAvTarih(e.target.value)} /></div>
+              <div><label>Açıklama</label><input type="text" placeholder="ör: bu haftanın ödemesi" value={avAciklama} onChange={e => setAvAciklama(e.target.value)} /></div>
             </div>
-
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn-success" onClick={avansKaydet}>✓ Ödeme Yap</button>
-              {sonOdeme && (
-                <button className="btn btn-secondary" onClick={isciMakbuzAc}>
-                  📄 Makbuz PDF
-                </button>
-              )}
+              {sonOdeme && <button className="btn btn-secondary" onClick={isciMakbuzAc}>📄 Makbuz PDF</button>}
             </div>
-
             {sonOdeme && (
               <div style={{ marginTop: 10, background: 'rgba(46,196,182,.07)', border: '1px solid rgba(46,196,182,.3)', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 12, color: 'var(--text2)' }}>
                 ✓ <strong>{sonOdeme.isciIsim}</strong> — {tl(sonOdeme.tutar)} ödeme yapıldı
@@ -281,36 +188,25 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
         </div>
       </div>
 
-      {/* Haftalık özet */}
       <div className="panel">
         <div className="panel-header">
           <div className="panel-title">İşçi Durumu (Bu Hafta)</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace' }}>
-            {fd(bas)} — {fd(bit)}
-          </div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace' }}>{fd(bas)} — {fd(bit)}</div>
         </div>
         <div className="panel-body">
           <div className="three-col">
-            {data.isciler.length === 0 ? (
-              <div className="empty" style={{ gridColumn: '1/-1' }}>İşçi eklenmemiş</div>
-            ) : data.isciler.map((i) => {
-              const k      = isciKazanc(i.id);
-              const odened = isciOdenen(i.id);
-              const kalan  = k.top - odened;
+            {data.isciler.length === 0 ? <div className="empty" style={{ gridColumn: '1/-1' }}>İşçi eklenmemiş</div> : data.isciler.map(i => {
+              const k = isciKazanc(i.id); const odened = isciOdenen(i.id); const kalan = k.top - odened;
               return (
                 <div key={i.id} className="stat-card" style={{ cursor: 'pointer' }} onClick={() => onIsciDetay(i.id)}>
                   <div className="stat-label" style={{ color: 'var(--accent)' }}>{i.isim}</div>
                   <div style={{ fontSize: 18, fontFamily: "'Bebas Neue', sans-serif", color: 'var(--text)' }}>{tl(k.top)}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
-                    Üretim: {tl(k.ure)} | Yükleme: {tl(k.yuk)}
-                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Üretim: {tl(k.ure)} | Yükleme: {tl(k.yuk)}</div>
                   <div style={{ fontSize: 11, marginTop: 4 }}>
                     <span style={{ color: 'var(--green)' }}>Ödenen: {tl(odened)}</span>{'  '}
                     <span className={kalan > 0 ? 'positive' : 'negative'}>Kalan: {tl(kalan)}</span>
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 6, fontFamily: 'IBM Plex Mono, monospace' }}>
-                    detay için tıkla →
-                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 6, fontFamily: 'IBM Plex Mono, monospace' }}>detay için tıkla →</div>
                 </div>
               );
             })}
@@ -318,32 +214,22 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
         </div>
       </div>
 
-      {/* İşçi listesi */}
       <div className="panel">
         <div className="panel-header"><div className="panel-title">İşçi Listesi</div></div>
         <div className="panel-body-0">
           <table>
-            <thead>
-              <tr><th>Ad Soyad</th><th>Bu Hafta Kazanç</th><th>Ödenen</th><th>Kalan Alacak</th><th></th></tr>
-            </thead>
+            <thead><tr><th>Ad Soyad</th><th>Bu Hafta Kazanç</th><th>Ödenen</th><th>Kalan Alacak</th><th></th></tr></thead>
             <tbody>
-              {data.isciler.length === 0 ? (
-                <tr><td colSpan={5} className="empty">İşçi yok</td></tr>
-              ) : data.isciler.map((i) => {
-                const k      = isciKazanc(i.id);
-                const odened = isciOdenen(i.id);
-                const kalan  = k.top - odened;
+              {data.isciler.length === 0 ? <tr><td colSpan={5} className="empty">İşçi yok</td></tr>
+              : data.isciler.map(i => {
+                const k = isciKazanc(i.id); const odened = isciOdenen(i.id); const kalan = k.top - odened;
                 return (
                   <tr key={i.id}>
-                    <td>
-                      <span style={isimStyle} onClick={() => onIsciDetay(i.id)}>{i.isim}</span>
-                    </td>
+                    <td><span style={isimStyle} onClick={() => onIsciDetay(i.id)}>{i.isim}</span></td>
                     <td className="td-mono">{tl(k.top)}</td>
                     <td className="td-mono positive">{tl(odened)}</td>
                     <td className={`td-mono ${kalan > 0 ? 'positive' : ''}`}>{tl(kalan)}</td>
-                    <td>
-                      <button className="btn btn-danger btn-sm" onClick={() => isciSilIste(i.id)}>Sil</button>
-                    </td>
+                    <td><button className="btn btn-danger btn-sm" onClick={() => isciSilIste(i.id)}>Sil</button></td>
                   </tr>
                 );
               })}
@@ -352,32 +238,22 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
         </div>
       </div>
 
-      {/* Ödeme hareketleri */}
       <div className="panel">
         <div className="panel-header"><div className="panel-title">Ödeme Hareketleri</div></div>
         <div className="panel-body-0">
           <table>
-            <thead>
-              <tr><th>Tarih</th><th>İşçi</th><th>Tutar</th><th>Açıklama</th><th></th></tr>
-            </thead>
+            <thead><tr><th>Tarih</th><th>İşçi</th><th>Tutar</th><th>Açıklama</th><th></th></tr></thead>
             <tbody>
-              {data.avanslar.length === 0 ? (
-                <tr><td colSpan={5} className="empty">Kayıt yok</td></tr>
-              ) : [...data.avanslar].sort((a, b) => b.tarih.localeCompare(a.tarih)).map((a) => {
-                const i = data.isciler.find((x) => x.id === a.isciId);
+              {data.avanslar.length === 0 ? <tr><td colSpan={5} className="empty">Kayıt yok</td></tr>
+              : [...data.avanslar].sort((a, b) => b.tarih.localeCompare(a.tarih)).map(a => {
+                const i = data.isciler.find(x => x.id === a.isciId);
                 return (
                   <tr key={a.id}>
                     <td>{fd(a.tarih)}</td>
-                    <td>
-                      <span style={isimStyle} onClick={() => i && onIsciDetay(i.id)}>
-                        {i?.isim || '?'}
-                      </span>
-                    </td>
+                    <td><span style={isimStyle} onClick={() => i && onIsciDetay(i.id)}>{i?.isim || '?'}</span></td>
                     <td className="td-mono positive">{tl(a.tutar)}</td>
                     <td>{a.aciklama || '—'}</td>
-                    <td>
-                      <button className="btn btn-danger btn-sm" onClick={() => avSil(a.id)}>Sil</button>
-                    </td>
+                    <td><button className="btn btn-danger btn-sm" onClick={() => avSil(a.id)}>Sil</button></td>
                   </tr>
                 );
               })}

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { AppData, GecmisBorc } from '@/types';
-import { tl, fd, today, uid, musteriAlacak, SIP_CESIT_LABEL } from '@/lib/storage';
+import { tl, fd, today, uid, musteriAlacak, SIP_CESIT_LABEL, saveMusteri, deleteMusteri, saveMusteriOdeme, deleteMusteriOdeme, saveGecmisBorc, deleteGecmisBorc } from '@/lib/storage';
 import { makbuzIndir } from '@/lib/pdfMakbuz';
 import MusteriSecici from '@/components/MusteriSecici';
 

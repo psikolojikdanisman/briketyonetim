@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { AppData, SpotSatis, Musteri } from '@/types';
-import { tl, fd, today, uid, SIP_CESIT_LABEL, SIP_BIRIM } from '@/lib/storage';
+import { tl, fd, today, uid, SIP_CESIT_LABEL, SIP_BIRIM, saveSpotSatis, deleteSpotSatis, saveSpotOdeme, deleteSpotOdeme, saveMusteri, saveKoy } from '@/lib/storage';
 import { makbuzIndir } from '@/lib/pdfMakbuz';
 import MusteriSecici from '@/components/MusteriSecici';
 

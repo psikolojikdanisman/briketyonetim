@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import type { AppData, Malzeme } from '@/types';
-import { tl, fd, today, uid, TURADI } from '@/lib/storage';
+import { tl, fd, today, uid, TURADI, saveMalzeme, deleteMalzeme, saveTedarikOdeme, deleteTedarikOdeme, saveTedarikci, deleteTedarikci } from '@/lib/storage';
 import { makbuzIndir } from '@/lib/pdfMakbuz';
 
 interface MalzemeProps {

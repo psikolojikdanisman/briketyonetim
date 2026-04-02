@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo, useRef } from 'react';
 import type { AppData, Siparis, Teslimat, Musteri } from '@/types';
-import { tl, fd, today, uid, SIP_BIRIM, SIP_CESIT_LABEL } from '@/lib/storage';
+import { tl, fd, today, uid, SIP_BIRIM, SIP_CESIT_LABEL, saveSiparis, deleteSiparis, saveTeslimat, saveMusteri, saveKoy } from '@/lib/storage';
 import MusteriSecici from '@/components/MusteriSecici';
 import { makbuzYazdir } from '@/lib/makbuzYazdir';
 
