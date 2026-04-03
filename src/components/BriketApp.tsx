@@ -7,6 +7,7 @@ import {
   PAGE_TITLES,
   backupGerekliMi,
   backupTarihiGuncelle,
+  SupabaseYuklemeHatasi,
 } from '@/lib/storage';
 import { supabase, cikisYap, mevcutOturum } from '@/lib/supabase';
 import Sidebar from './Sidebar';
@@ -28,16 +29,19 @@ import AyarlarPage from './pages/Ayarlar';
 const BACKUP_UYARI_GUN_LABEL = 7;
 
 type AuthDurum = 'kontrol' | 'girilmedi' | 'girildi';
+type VeriDurum = 'yukleniyor' | 'yuklendi' | 'hata';
 
 export default function BriketApp() {
   const [authDurum, setAuthDurum]         = useState<AuthDurum>('kontrol');
+  const [veriDurum, setVeriDurum]         = useState<VeriDurum>('yukleniyor');
+  const [yuklemeHata, setYuklemeHata]     = useState<string | null>(null);
   const [data, setData]                   = useState<AppData | null>(null);
   const [page, setPage]                   = useState<PageKey>('dashboard');
   const [aktifIsciId, setAktifIsciId]     = useState<number | null>(null);
   const [toast, setToast]                 = useState<ToastState>({ message: '', ok: true, visible: false });
   const [dateStr, setDateStr]             = useState('');
-  const [backupUyari, setBackupUyari]                 = useState(false);
-  const [backupBannerKapali, setBackupBannerKapali]   = useState(false);
+  const [backupUyari, setBackupUyari]               = useState(false);
+  const [backupBannerKapali, setBackupBannerKapali] = useState(false);
 
   // ── Auth durumunu kontrol et ──────────────────────────────────────────────
   useEffect(() => {
@@ -45,12 +49,12 @@ export default function BriketApp() {
       setAuthDurum(session ? 'girildi' : 'girilmedi');
     });
 
-    // Oturum değişikliklerini dinle (sekme arası senkronizasyon)
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthDurum(session ? 'girildi' : 'girilmedi');
       if (!session) {
-        // Oturum kapandıysa veriyi temizle
         setData(null);
+        setVeriDurum('yukleniyor');
+        setYuklemeHata(null);
         setPage('dashboard');
       }
     });
@@ -61,13 +65,30 @@ export default function BriketApp() {
   // ── Oturum açıldıktan sonra veri yükle ───────────────────────────────────
   useEffect(() => {
     if (authDurum !== 'girildi') return;
-    loadDataFromSupabase().then(setData);
-    setDateStr(
-      new Date().toLocaleDateString('tr-TR', {
-        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+
+    setVeriDurum('yukleniyor');
+    setYuklemeHata(null);
+
+    loadDataFromSupabase()
+      .then(yuklenenData => {
+        setData(yuklenenData);
+        setVeriDurum('yuklendi');
+        setDateStr(
+          new Date().toLocaleDateString('tr-TR', {
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+          })
+        );
+        setBackupUyari(backupGerekliMi());
       })
-    );
-    setBackupUyari(backupGerekliMi());
+      .catch((hata: unknown) => {
+        setVeriDurum('hata');
+        if (hata instanceof SupabaseYuklemeHatasi) {
+          setYuklemeHata(hata.message);
+        } else {
+          setYuklemeHata('Veriler yüklenirken beklenmedik bir hata oluştu. Sayfayı yenileyin.');
+        }
+        console.error('[BriketApp] Veri yükleme hatası:', hata);
+      });
   }, [authDurum]);
 
   const handleSave = useCallback((newData: AppData) => {
@@ -82,7 +103,24 @@ export default function BriketApp() {
 
   async function handleCikis() {
     await cikisYap();
-    // onAuthStateChange zaten authDurum'u güncelleyecek
+  }
+
+  function handleYenile() {
+    setVeriDurum('yukleniyor');
+    setYuklemeHata(null);
+    loadDataFromSupabase()
+      .then(yuklenenData => {
+        setData(yuklenenData);
+        setVeriDurum('yuklendi');
+      })
+      .catch((hata: unknown) => {
+        setVeriDurum('hata');
+        if (hata instanceof SupabaseYuklemeHatasi) {
+          setYuklemeHata(hata.message);
+        } else {
+          setYuklemeHata('Veriler yüklenirken beklenmedik bir hata oluştu. Sayfayı yenileyin.');
+        }
+      });
   }
 
   const backupUyariGoster = useMemo(
@@ -122,8 +160,52 @@ export default function BriketApp() {
     return <LoginPage onGiris={() => setAuthDurum('girildi')} />;
   }
 
+  // ── Veri yükleme hatası ───────────────────────────────────────────────────
+  if (veriDurum === 'hata') {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', background: 'var(--bg)', flexDirection: 'column', gap: '16px',
+        padding: '24px',
+      }}>
+        <div style={{ fontSize: 40 }}>⚠️</div>
+        <div style={{
+          fontFamily: "'Bebas Neue', sans-serif", fontSize: 22,
+          letterSpacing: 2, color: 'var(--red)',
+        }}>
+          VERİ YÜKLENEMEDİ
+        </div>
+        <div style={{
+          maxWidth: 420, textAlign: 'center', fontSize: 13,
+          color: 'var(--text2)', lineHeight: 1.7,
+          background: 'rgba(184,60,43,0.07)',
+          border: '1px solid rgba(184,60,43,0.22)',
+          borderRadius: 'var(--radius)',
+          padding: '14px 20px',
+        }}>
+          {yuklemeHata}
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          <button
+            onClick={handleYenile}
+            className="btn btn-primary"
+          >
+            ↻ Tekrar Dene
+          </button>
+          <button
+            onClick={handleCikis}
+            className="btn btn-secondary"
+          >
+            ⎋ Çıkış Yap
+          </button>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   // ── Veri yükleniyor ───────────────────────────────────────────────────────
-  if (!data) {
+  if (veriDurum === 'yukleniyor' || !data) {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',

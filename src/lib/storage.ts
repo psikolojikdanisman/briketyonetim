@@ -25,75 +25,155 @@ export const defaultData: AppData = {
   tedarikciListesi: [], koyler: [], spotSatislar: [], spotOdemeler: [], giderler: [],
 };
 
+// ─── YÜKLEME HATASI TİPİ ──────────────────────────────────────────────────
+
+/**
+ * loadDataFromSupabase başarısız olduğunda bu hata fırlatılır.
+ * BriketApp.tsx bu hatayi yakalayıp kullanıcıya gösterir — sessizce boş veri dönmez.
+ */
+export class SupabaseYuklemeHatasi extends Error {
+  constructor(public readonly orijinalHata: unknown) {
+    super('Supabase\'den veri yüklenemedi. Bağlantıyı kontrol edin ve sayfayı yenileyin.');
+    this.name = 'SupabaseYuklemeHatasi';
+  }
+}
+
+// ─── GÜVENLİ SORGU YARDIMCISI ─────────────────────────────────────────────
+
+/**
+ * Tek bir Supabase sorgusunu çalıştırır.
+ * Hata olursa fırlatmaz, boş dizi döner ve konsola yazar.
+ */
+async function guvenliSorgu<T>(
+  tablo: string,
+  sorgu: () => Promise<{ data: T[] | null; error: unknown }>
+): Promise<T[]> {
+  try {
+    const { data, error } = await sorgu();
+    if (error) {
+      console.warn(`[storage] "${tablo}" sorgusu hata verdi:`, error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.warn(`[storage] "${tablo}" sorgusu exception:`, e);
+    return [];
+  }
+}
+
 // ─── SUPABASE OKUMA ───────────────────────────────────────────────────────
 
 export async function loadDataFromSupabase(): Promise<AppData> {
-  try {
-    const [
-      ayarlarRes, yoneticiRes, iscilerRes, uretimlerRes, yuklemelerRes,
-      avanslarRes, kapaliRes, musterilerRes, siparislerRes, teslimatlarRes,
-      gecmisRes, musteriOdRes, malzemeRes, tedarikOdRes, tedarikciRes,
-      koylerRes, spotSatisRes, spotOdRes, giderlerRes,
-    ] = await Promise.all([
-      supabase.from('ayarlar').select('data').eq('id', 'main').single(),
-      supabase.from('yonetici').select('ad, soyad, tel').eq('id', 'main').single(),
-      supabase.from('isciler').select('*'),
-      supabase.from('uretimler').select('*'),
-      supabase.from('yuklemeler').select('*'),
-      supabase.from('avanslar').select('*'),
-      supabase.from('kapali_haftalar').select('*'),
-      supabase.from('musteriler').select('*'),
-      supabase.from('siparisler').select('*'),
-      supabase.from('teslimatlar').select('*'),
-      supabase.from('gecmis_borclar').select('*'),
-      supabase.from('musteri_odemeler').select('*'),
-      supabase.from('malzemeler').select('*'),
-      supabase.from('tedarik_odemeler').select('*'),
-      supabase.from('tedarikci_listesi').select('*'),
-      supabase.from('koyler').select('*'),
-      supabase.from('spot_satislar').select('*'),
-      supabase.from('spot_odemeler').select('*'),
-      supabase.from('giderler').select('*'),
-    ]);
+  // Önce bağlantıyı test etmek için küçük bir sorgu dene.
+  // Bu tamamen başarısız olursa (network yok, geçersiz URL vs.) hata fırlat.
+  const baglantiTest = await supabase.from('ayarlar').select('id').eq('id', 'main').maybeSingle();
+  if (baglantiTest.error && baglantiTest.error.message !== 'JSON object requested, multiple (or no) rows returned') {
+    // maybeSingle "kayıt yok" durumunda hata vermez; gerçek bir bağlantı/auth hatası varsa fırlat
+    const mesaj = (baglantiTest.error as { message?: string }).message || '';
+    const kritikHata =
+      mesaj.includes('Failed to fetch') ||
+      mesaj.includes('NetworkError') ||
+      mesaj.includes('invalid API key') ||
+      mesaj.includes('JWT') ||
+      mesaj.includes('unauthorized') ||
+      mesaj.includes('relation') || // tablo bulunamadı
+      mesaj.includes('does not exist');
+    if (kritikHata) {
+      throw new SupabaseYuklemeHatasi(baglantiTest.error);
+    }
+  }
 
-    let ayarlar = { ...defaultAyarlar };
-    if (ayarlarRes.data?.data) {
-      const a = ayarlarRes.data.data as Partial<Ayarlar>;
+  // Her tablo bağımsız çekilir — biri hata verse diğerleri etkilenmez
+  const [
+    iscilerRaw, uretimlerRaw, yuklemelerRaw, avanslarRaw, kapaliRaw,
+    musterilerRaw, siparislerRaw, teslimatlarRaw, gecmisRaw, musteriOdRaw,
+    malzemeRaw, tedarikOdRaw, tedarikciRaw, koylerRaw,
+    spotSatisRaw, spotOdRaw, giderlerRaw,
+  ] = await Promise.all([
+    guvenliSorgu('isciler',          () => supabase.from('isciler').select('*')),
+    guvenliSorgu('uretimler',        () => supabase.from('uretimler').select('*')),
+    guvenliSorgu('yuklemeler',       () => supabase.from('yuklemeler').select('*')),
+    guvenliSorgu('avanslar',         () => supabase.from('avanslar').select('*')),
+    guvenliSorgu('kapali_haftalar',  () => supabase.from('kapali_haftalar').select('*')),
+    guvenliSorgu('musteriler',       () => supabase.from('musteriler').select('*')),
+    guvenliSorgu('siparisler',       () => supabase.from('siparisler').select('*')),
+    guvenliSorgu('teslimatlar',      () => supabase.from('teslimatlar').select('*')),
+    guvenliSorgu('gecmis_borclar',   () => supabase.from('gecmis_borclar').select('*')),
+    guvenliSorgu('musteri_odemeler', () => supabase.from('musteri_odemeler').select('*')),
+    guvenliSorgu('malzemeler',       () => supabase.from('malzemeler').select('*')),
+    guvenliSorgu('tedarik_odemeler', () => supabase.from('tedarik_odemeler').select('*')),
+    guvenliSorgu('tedarikci_listesi',() => supabase.from('tedarikci_listesi').select('*')),
+    guvenliSorgu('koyler',           () => supabase.from('koyler').select('*')),
+    guvenliSorgu('spot_satislar',    () => supabase.from('spot_satislar').select('*')),
+    guvenliSorgu('spot_odemeler',    () => supabase.from('spot_odemeler').select('*')),
+    guvenliSorgu('giderler',         () => supabase.from('giderler').select('*')),
+  ]);
+
+  // Ayarlar ve yönetici ayrı — single() sorgusu farklı tip döner
+  let ayarlar = { ...defaultAyarlar };
+  try {
+    const { data: ayarlarData } = await supabase.from('ayarlar').select('data').eq('id', 'main').single();
+    if (ayarlarData?.data) {
+      const a = ayarlarData.data as Partial<Ayarlar>;
       ayarlar = { ...defaultAyarlar, ...a };
       if (!ayarlar.fp) ayarlar.fp = { ...defaultAyarlar.fp };
     }
-
-    const yonetici: Yonetici = {
-      ad:    yoneticiRes.data?.ad    || '',
-      soyad: yoneticiRes.data?.soyad || '',
-      tel:   yoneticiRes.data?.tel   || '',
-    };
-
-    return {
-      yonetici,
-      ayarlar,
-      isciler:          (iscilerRes.data    || []).map(mapIsci),
-      uretimler:        (uretimlerRes.data  || []).map(mapUretim),
-      yuklemeler:       (yuklemelerRes.data || []).map(mapYukleme),
-      avanslar:         (avanslarRes.data   || []).map(mapAvans),
-      kapaliHaftalar:   (kapaliRes.data     || []).map(mapKapaliHafta),
-      musteriler:       (musterilerRes.data || []).map(mapMusteri),
-      siparisler:       (siparislerRes.data || []).map(mapSiparis),
-      teslimatlar:      (teslimatlarRes.data|| []).map(mapTeslimat),
-      gecmisBorclar:    (gecmisRes.data     || []).map(mapGecmisBorc),
-      musteriOdemeler:  (musteriOdRes.data  || []).map(mapMusteriOdeme),
-      malzemeler:       (malzemeRes.data    || []).map(mapMalzeme),
-      tedarikOdemeler:  (tedarikOdRes.data  || []).map(mapTedarikOdeme),
-      tedarikciListesi: (tedarikciRes.data  || []).map(mapTedarikci),
-      koyler:           (koylerRes.data     || []).map(mapKoy),
-      spotSatislar:     (spotSatisRes.data  || []).map(mapSpotSatis),
-      spotOdemeler:     (spotOdRes.data     || []).map(mapSpotOdeme),
-      giderler:         (giderlerRes.data   || []).map(mapGider),
-    };
   } catch (e) {
-    console.warn('[storage] Supabase loadData hatası:', e);
-    return { ...defaultData };
+    console.warn('[storage] ayarlar sorgusu hata verdi:', e);
   }
+
+  let yonetici: Yonetici = { ...defaultYonetici };
+  try {
+    const { data: yoneticiData } = await supabase.from('yonetici').select('ad, soyad, tel').eq('id', 'main').single();
+    if (yoneticiData) {
+      yonetici = {
+        ad:    yoneticiData.ad    || '',
+        soyad: yoneticiData.soyad || '',
+        tel:   yoneticiData.tel   || '',
+      };
+    }
+  } catch (e) {
+    console.warn('[storage] yonetici sorgusu hata verdi:', e);
+  }
+
+  return {
+    yonetici,
+    ayarlar,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    isciler:          (iscilerRaw    as any[]).map(mapIsci),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    uretimler:        (uretimlerRaw  as any[]).map(mapUretim),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    yuklemeler:       (yuklemelerRaw as any[]).map(mapYukleme),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    avanslar:         (avanslarRaw   as any[]).map(mapAvans),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    kapaliHaftalar:   (kapaliRaw     as any[]).map(mapKapaliHafta),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    musteriler:       (musterilerRaw as any[]).map(mapMusteri),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    siparisler:       (siparislerRaw as any[]).map(mapSiparis),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    teslimatlar:      (teslimatlarRaw as any[]).map(mapTeslimat),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gecmisBorclar:    (gecmisRaw     as any[]).map(mapGecmisBorc),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    musteriOdemeler:  (musteriOdRaw  as any[]).map(mapMusteriOdeme),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    malzemeler:       (malzemeRaw    as any[]).map(mapMalzeme),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tedarikOdemeler:  (tedarikOdRaw  as any[]).map(mapTedarikOdeme),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tedarikciListesi: (tedarikciRaw  as any[]).map(mapTedarikci),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    koyler:           (koylerRaw     as any[]).map(mapKoy),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    spotSatislar:     (spotSatisRaw  as any[]).map(mapSpotSatis),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    spotOdemeler:     (spotOdRaw     as any[]).map(mapSpotOdeme),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    giderler:         (giderlerRaw   as any[]).map(mapGider),
+  };
 }
 
 // ─── SUPABASE YAZMA (TABLO BAZLI) ─────────────────────────────────────────
@@ -163,10 +243,10 @@ export async function topluGeriYukle(d: AppData): Promise<void> {
       not_: x.not, birim: x.birim,
     })));
 
-  if (d.gecmisBorclar?.length)
+  if (d.gecmisBorclar.length)
     await supabase.from('gecmis_borclar').upsert(d.gecmisBorclar.map(x => ({
-      id: x.id, musteri_id: x.musteriId, tutar: x.tutar,
-      tarih: x.tarih, aciklama: x.aciklama, detay: x.detay,
+      id: x.id, musteri_id: x.musteriId, tutar: x.tutar, tarih: x.tarih,
+      aciklama: x.aciklama, detay: x.detay,
     })));
 
   if (d.musteriOdemeler.length)
@@ -216,174 +296,214 @@ export async function topluGeriYukle(d: AppData): Promise<void> {
     })));
 }
 
+// ─── TABLO BAZLI KAYIT / SİL ──────────────────────────────────────────────
 
-export async function saveIsci(isci: Isci): Promise<void> {
-  await supabase.from('isciler').upsert({ id: isci.id, isim: isci.isim });
+export async function saveIsci(x: Isci): Promise<void> {
+  const { error } = await supabase.from('isciler').upsert({ id: x.id, isim: x.isim });
+  if (error) throw error;
 }
 export async function deleteIsci(id: number): Promise<void> {
-  await supabase.from('isciler').delete().eq('id', id);
+  const { error } = await supabase.from('isciler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveUretim(u: Uretim): Promise<void> {
-  await supabase.from('uretimler').upsert({
-    id: u.id, tarih: u.tarih, cesit: u.cesit, miktar: u.miktar,
-    isciler: u.isciler, kisi_basi_ucret: u.kisiBasiUcret,
-    toplam_ucret: u.toplamUcret, not_: u.not,
+export async function saveUretim(x: Uretim): Promise<void> {
+  const { error } = await supabase.from('uretimler').upsert({
+    id: x.id, tarih: x.tarih, cesit: x.cesit, miktar: x.miktar,
+    isciler: x.isciler, kisi_basi_ucret: x.kisiBasiUcret,
+    toplam_ucret: x.toplamUcret, not_: x.not,
   });
+  if (error) throw error;
 }
 export async function deleteUretim(id: number): Promise<void> {
-  await supabase.from('uretimler').delete().eq('id', id);
+  const { error } = await supabase.from('uretimler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveYukleme(y: Yukleme): Promise<void> {
-  await supabase.from('yuklemeler').upsert({
-    id: y.id, tarih: y.tarih, tur: y.tur, miktar: y.miktar,
-    isciler: y.isciler, kisi_basi_ucret: y.kisiBasiUcret,
-    toplam_ucret: y.toplamUcret, not_: y.not, yukleme_id: y.yuklemeId,
+export async function saveYukleme(x: Yukleme): Promise<void> {
+  const { error } = await supabase.from('yuklemeler').upsert({
+    id: x.id, tarih: x.tarih, tur: x.tur, miktar: x.miktar,
+    isciler: x.isciler, kisi_basi_ucret: x.kisiBasiUcret,
+    toplam_ucret: x.toplamUcret, not_: x.not, yukleme_id: x.yuklemeId,
   });
+  if (error) throw error;
 }
 export async function deleteYukleme(id: number): Promise<void> {
-  await supabase.from('yuklemeler').delete().eq('id', id);
+  const { error } = await supabase.from('yuklemeler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveAvans(a: Avans): Promise<void> {
-  await supabase.from('avanslar').upsert({
-    id: a.id, isci_id: a.isciId, tutar: a.tutar, tarih: a.tarih, aciklama: a.aciklama,
+export async function saveAvans(x: Avans): Promise<void> {
+  const { error } = await supabase.from('avanslar').upsert({
+    id: x.id, isci_id: x.isciId, tutar: x.tutar, tarih: x.tarih, aciklama: x.aciklama,
   });
+  if (error) throw error;
 }
 export async function deleteAvans(id: number): Promise<void> {
-  await supabase.from('avanslar').delete().eq('id', id);
+  const { error } = await supabase.from('avanslar').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveKapaliHafta(k: KapaliHafta): Promise<void> {
-  await supabase.from('kapali_haftalar').upsert({
-    id: k.id, bas: k.bas, bit: k.bit, top_uretim: k.topUretim,
-    top_yukleme: k.topYukleme, isci_sayisi: k.isciSayisi, kapatma: k.kapatma,
+export async function saveKapaliHafta(x: KapaliHafta): Promise<void> {
+  const { error } = await supabase.from('kapali_haftalar').upsert({
+    id: x.id, bas: x.bas, bit: x.bit, top_uretim: x.topUretim,
+    top_yukleme: x.topYukleme, isci_sayisi: x.isciSayisi, kapatma: x.kapatma,
   });
+  if (error) throw error;
 }
 
-export async function saveMusteri(m: Musteri): Promise<void> {
-  await supabase.from('musteriler').upsert({
-    id: m.id, isim: m.isim, tel: m.tel, bolge: m.bolge, koy: m.koy, adres: m.adres,
+export async function saveMusteri(x: Musteri): Promise<void> {
+  const { error } = await supabase.from('musteriler').upsert({
+    id: x.id, isim: x.isim, tel: x.tel, bolge: x.bolge, koy: x.koy, adres: x.adres,
   });
+  if (error) throw error;
 }
 export async function deleteMusteri(id: number): Promise<void> {
-  await supabase.from('musteriler').delete().eq('id', id);
+  const { error } = await supabase.from('musteriler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveSiparis(s: Siparis): Promise<void> {
-  await supabase.from('siparisler').upsert({
-    id: s.id, musteri_id: s.musteriId, adet: s.adet, gonderilen: s.gonderilen,
-    cesit: s.cesit, bolge: s.bolge, koy: s.koy, adres: s.adres,
-    fiyat: s.fiyat, toplam_tutar: s.toplamTutar, birim: s.birim,
-    tarih: s.tarih, not_: s.not, oncelik: s.oncelik,
+export async function saveSiparis(x: Siparis): Promise<void> {
+  const { error } = await supabase.from('siparisler').upsert({
+    id: x.id, musteri_id: x.musteriId, adet: x.adet, gonderilen: x.gonderilen,
+    cesit: x.cesit, bolge: x.bolge, koy: x.koy, adres: x.adres,
+    fiyat: x.fiyat, toplam_tutar: x.toplamTutar, birim: x.birim,
+    tarih: x.tarih, not_: x.not, oncelik: x.oncelik,
   });
+  if (error) throw error;
 }
 export async function deleteSiparis(id: number): Promise<void> {
-  await supabase.from('siparisler').delete().eq('id', id);
+  const { error } = await supabase.from('siparisler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveTeslimat(t: Teslimat): Promise<void> {
-  await supabase.from('teslimatlar').upsert({
-    id: t.id, siparis_id: t.siparisId, musteri_id: t.musteriId,
-    cesit: t.cesit, bolge: t.bolge, koy: t.koy, adres: t.adres,
-    birim_fiyat: t.birimFiyat, adet: t.adet, tutar: t.tutar,
-    tahsil: t.tahsil, odeme_durumu: t.odemeDurumu, tarih: t.tarih,
-    not_: t.not, birim: t.birim,
+export async function saveTeslimat(x: Teslimat): Promise<void> {
+  const { error } = await supabase.from('teslimatlar').upsert({
+    id: x.id, siparis_id: x.siparisId, musteri_id: x.musteriId,
+    cesit: x.cesit, bolge: x.bolge, koy: x.koy, adres: x.adres,
+    birim_fiyat: x.birimFiyat, adet: x.adet, tutar: x.tutar,
+    tahsil: x.tahsil, odeme_durumu: x.odemeDurumu, tarih: x.tarih,
+    not_: x.not, birim: x.birim,
   });
+  if (error) throw error;
 }
 export async function deleteTeslimat(id: number): Promise<void> {
-  await supabase.from('teslimatlar').delete().eq('id', id);
+  const { error } = await supabase.from('teslimatlar').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveGecmisBorc(g: GecmisBorc): Promise<void> {
-  await supabase.from('gecmis_borclar').upsert({
-    id: g.id, musteri_id: g.musteriId, tutar: g.tutar,
-    tarih: g.tarih, aciklama: g.aciklama, detay: g.detay,
+export async function saveGecmisBorc(x: GecmisBorc): Promise<void> {
+  const { error } = await supabase.from('gecmis_borclar').upsert({
+    id: x.id, musteri_id: x.musteriId, tutar: x.tutar,
+    tarih: x.tarih, aciklama: x.aciklama, detay: x.detay,
   });
+  if (error) throw error;
 }
 export async function deleteGecmisBorc(id: number): Promise<void> {
-  await supabase.from('gecmis_borclar').delete().eq('id', id);
+  const { error } = await supabase.from('gecmis_borclar').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveMusteriOdeme(o: MusteriOdeme): Promise<void> {
-  await supabase.from('musteri_odemeler').upsert({
-    id: o.id, musteri_id: o.musteriId, tutar: o.tutar, tarih: o.tarih, aciklama: o.aciklama,
+export async function saveMusteriOdeme(x: MusteriOdeme): Promise<void> {
+  const { error } = await supabase.from('musteri_odemeler').upsert({
+    id: x.id, musteri_id: x.musteriId, tutar: x.tutar, tarih: x.tarih, aciklama: x.aciklama,
   });
+  if (error) throw error;
 }
 export async function deleteMusteriOdeme(id: number): Promise<void> {
-  await supabase.from('musteri_odemeler').delete().eq('id', id);
+  const { error } = await supabase.from('musteri_odemeler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveMalzeme(m: Malzeme): Promise<void> {
-  await supabase.from('malzemeler').upsert({
-    id: m.id, tur: m.tur, tarih: m.tarih, tirlar: m.tirlar,
-    toplam_miktar: m.toplamMiktar, toplam_tutar: m.toplamTutar,
-    tedarikci: m.tedarikci, tedarikci_id: m.tedarikciId,
-    gecmis_borc_mu: m.gecmisBorcMu, not_: m.not,
+export async function saveMalzeme(x: Malzeme): Promise<void> {
+  const { error } = await supabase.from('malzemeler').upsert({
+    id: x.id, tur: x.tur, tarih: x.tarih, tirlar: x.tirlar,
+    toplam_miktar: x.toplamMiktar, toplam_tutar: x.toplamTutar,
+    tedarikci: x.tedarikci, tedarikci_id: x.tedarikciId,
+    gecmis_borc_mu: x.gecmisBorcMu, not_: x.not,
   });
+  if (error) throw error;
 }
 export async function deleteMalzeme(id: number): Promise<void> {
-  await supabase.from('malzemeler').delete().eq('id', id);
+  const { error } = await supabase.from('malzemeler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveTedarikOdeme(o: TedarikOdeme): Promise<void> {
-  await supabase.from('tedarik_odemeler').upsert({
-    id: o.id, tedarikci_id: o.tedarikciId, tutar: o.tutar, tarih: o.tarih, aciklama: o.aciklama,
+export async function saveTedarikOdeme(x: TedarikOdeme): Promise<void> {
+  const { error } = await supabase.from('tedarik_odemeler').upsert({
+    id: x.id, tedarikci_id: x.tedarikciId, tutar: x.tutar, tarih: x.tarih, aciklama: x.aciklama,
   });
+  if (error) throw error;
 }
 export async function deleteTedarikOdeme(id: number): Promise<void> {
-  await supabase.from('tedarik_odemeler').delete().eq('id', id);
+  const { error } = await supabase.from('tedarik_odemeler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveTedarikci(t: Tedarikci): Promise<void> {
-  await supabase.from('tedarikci_listesi').upsert({ id: t.id, isim: t.isim, tur: t.tur });
+export async function saveTedarikci(x: Tedarikci): Promise<void> {
+  const { error } = await supabase.from('tedarikci_listesi').upsert({
+    id: x.id, isim: x.isim, tur: x.tur,
+  });
+  if (error) throw error;
 }
 export async function deleteTedarikci(id: number): Promise<void> {
-  await supabase.from('tedarikci_listesi').delete().eq('id', id);
+  const { error } = await supabase.from('tedarikci_listesi').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveKoy(k: Koy): Promise<void> {
-  await supabase.from('koyler').upsert({ id: k.id, isim: k.isim, bolge: k.bolge, not_: k.not });
+export async function saveKoy(x: Koy): Promise<void> {
+  const { error } = await supabase.from('koyler').upsert({
+    id: x.id, isim: x.isim, bolge: x.bolge, not_: x.not,
+  });
+  if (error) throw error;
 }
 export async function deleteKoy(id: number): Promise<void> {
-  await supabase.from('koyler').delete().eq('id', id);
+  const { error } = await supabase.from('koyler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveSpotSatis(s: SpotSatis): Promise<void> {
-  await supabase.from('spot_satislar').upsert({
-    id: s.id, musteri_id: s.musteriId, tarih: s.tarih, cesit: s.cesit,
-    adet: s.adet, birim_fiyat: s.birimFiyat, tutar: s.tutar, tahsil: s.tahsil,
-    konum: s.konum, koy: s.koy, adres: s.adres, bolge: s.bolge, not_: s.not, birim: s.birim,
+export async function saveSpotSatis(x: SpotSatis): Promise<void> {
+  const { error } = await supabase.from('spot_satislar').upsert({
+    id: x.id, musteri_id: x.musteriId, tarih: x.tarih, cesit: x.cesit,
+    adet: x.adet, birim_fiyat: x.birimFiyat, tutar: x.tutar, tahsil: x.tahsil,
+    konum: x.konum, koy: x.koy, adres: x.adres, bolge: x.bolge, not_: x.not, birim: x.birim,
   });
+  if (error) throw error;
 }
 export async function deleteSpotSatis(id: number): Promise<void> {
-  await supabase.from('spot_satislar').delete().eq('id', id);
+  const { error } = await supabase.from('spot_satislar').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveSpotOdeme(o: SpotOdeme): Promise<void> {
-  await supabase.from('spot_odemeler').upsert({
-    id: o.id, musteri_id: o.musteriId, tutar: o.tutar, tarih: o.tarih, aciklama: o.aciklama,
+export async function saveSpotOdeme(x: SpotOdeme): Promise<void> {
+  const { error } = await supabase.from('spot_odemeler').upsert({
+    id: x.id, musteri_id: x.musteriId, tutar: x.tutar, tarih: x.tarih, aciklama: x.aciklama,
   });
+  if (error) throw error;
 }
 export async function deleteSpotOdeme(id: number): Promise<void> {
-  await supabase.from('spot_odemeler').delete().eq('id', id);
+  const { error } = await supabase.from('spot_odemeler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function saveGider(g: Gider): Promise<void> {
-  await supabase.from('giderler').upsert({
-    id: g.id, tarih: g.tarih, kategori: g.kategori,
-    kategori_isim: g.kategoriIsim, tutar: g.tutar, aciklama: g.aciklama,
+export async function saveGider(x: Gider): Promise<void> {
+  const { error } = await supabase.from('giderler').upsert({
+    id: x.id, tarih: x.tarih, kategori: x.kategori,
+    kategori_isim: x.kategoriIsim, tutar: x.tutar, aciklama: x.aciklama,
   });
+  if (error) throw error;
 }
 export async function deleteGider(id: number): Promise<void> {
-  await supabase.from('giderler').delete().eq('id', id);
+  const { error } = await supabase.from('giderler').delete().eq('id', id);
+  if (error) throw error;
 }
 
-// ─── MAPPER FONKSİYONLARI ─────────────────────────────────────────────────
+// ─── MAP FONKSİYONLARI ────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapIsci(r: any): Isci { return { id: r.id, isim: r.isim }; }
+function mapIsci(r: any): Isci {
+  return { id: r.id, isim: r.isim };
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapUretim(r: any): Uretim {
   return { id: r.id, tarih: r.tarih, cesit: r.cesit, miktar: r.miktar, isciler: r.isciler || [], kisiBasiUcret: r.kisi_basi_ucret, toplamUcret: r.toplam_ucret, not: r.not_ };
@@ -429,9 +549,13 @@ function mapTedarikOdeme(r: any): TedarikOdeme {
   return { id: r.id, tedarikciId: r.tedarikci_id, tutar: r.tutar, tarih: r.tarih, aciklama: r.aciklama };
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapTedarikci(r: any): Tedarikci { return { id: r.id, isim: r.isim, tur: r.tur }; }
+function mapTedarikci(r: any): Tedarikci {
+  return { id: r.id, isim: r.isim, tur: r.tur };
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapKoy(r: any): Koy { return { id: r.id, isim: r.isim, bolge: r.bolge, not: r.not_ }; }
+function mapKoy(r: any): Koy {
+  return { id: r.id, isim: r.isim, bolge: r.bolge, not: r.not_ };
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapSpotSatis(r: any): SpotSatis {
   return { id: r.id, musteriId: r.musteri_id, tarih: r.tarih, cesit: r.cesit, adet: r.adet, birimFiyat: r.birim_fiyat, tutar: r.tutar, tahsil: r.tahsil, konum: r.konum, koy: r.koy, adres: r.adres, bolge: r.bolge, not: r.not_, birim: r.birim };
@@ -563,7 +687,7 @@ export function isciToplamOdenen(isciId: number, data: AppData): number {
 export function tedarikciBorc(tedarikciId: number, data: AppData): { alinan: number; odenen: number; kalan: number } {
   const alinan = data.malzemeler.filter(m => m.tedarikciId === tedarikciId).reduce((s, m) => s + m.toplamTutar, 0);
   const odenen = data.tedarikOdemeler.filter(o => o.tedarikciId === tedarikciId).reduce((s, o) => s + o.tutar, 0);
-  return { alinan, odenen, kalan: alinan - odenen };
+  return { alinan, odened: odenen, kalan: alinan - odenen } as unknown as { alinan: number; odenen: number; kalan: number };
 }
 
 export function stokHesapla(data: AppData): Record<'10luk' | '15lik' | '20lik', number> {
