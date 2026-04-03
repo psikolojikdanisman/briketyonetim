@@ -26,24 +26,31 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
   }
 
   async function kaydet() {
-    const m = parseFloat(miktar);
-    const newErrors = { miktar: !m || m <= 0, isciler: seciliIsciler.length === 0 };
-    setErrors(newErrors);
-    if (newErrors.miktar) { showToast('Miktar gerekli', false); return; }
-    if (newErrors.isciler) { showToast('En az 1 işçi seçin', false); return; }
-
-    const yeni: Uretim = { id: uid(), tarih, cesit, miktar: m, isciler: seciliIsciler, kisiBasiUcret, toplamUcret, not };
-    const newData = { ...data, uretimler: [...data.uretimler, yeni] };
-    onSave(newData);
-    await saveUretim(yeni);
-    setMiktar(''); setSeciliIsciler([]); setNot(''); setErrors({});
-    showToast('Üretim kaydedildi ✓');
+    try {
+      const m = parseFloat(miktar);
+      const newErrors = { miktar: !m || m <= 0, isciler: seciliIsciler.length === 0 };
+      setErrors(newErrors);
+      if (newErrors.miktar) { showToast('Miktar gerekli', false); return; }
+      if (newErrors.isciler) { showToast('En az 1 işçi seçin', false); return; }
+      const yeni: Uretim = { id: uid(), tarih, cesit, miktar: m, isciler: seciliIsciler, kisiBasiUcret, toplamUcret, not };
+      const newData = { ...data, uretimler: [...data.uretimler, yeni] };
+      onSave(newData);
+      await saveUretim(yeni);
+      setMiktar(''); setSeciliIsciler([]); setNot(''); setErrors({});
+      showToast('Üretim kaydedildi ✓');
+    } catch {
+      showToast('Üretim kaydedilemedi', false);
+    }
   }
 
   async function sil(id: number) {
-    onSave({ ...data, uretimler: data.uretimler.filter(u => u.id !== id) });
-    await deleteUretim(id);
-    showToast('Kayıt silindi');
+    try {
+      onSave({ ...data, uretimler: data.uretimler.filter(u => u.id !== id) });
+      await deleteUretim(id);
+      showToast('Kayıt silindi');
+    } catch {
+      showToast('Kayıt silinemedi', false);
+    }
   }
 
   const showCalc = parseFloat(miktar) > 0 && seciliIsciler.length > 0;

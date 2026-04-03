@@ -17,10 +17,14 @@ export default function AyarlarPage({ data, onSave, showToast, onBackupAlindi }:
   const [yon, setYon] = useState<Yonetici>({ ...data.yonetici });
 
   async function yoneticiKaydet() {
-    if (!yon.ad.trim() || !yon.soyad.trim()) { showToast('Ad ve soyad zorunludur', false); return; }
-    onSave({ ...data, yonetici: { ...yon } });
-    await saveYonetici(yon);
-    showToast('Yönetici bilgileri kaydedildi ✓');
+    try {
+      if (!yon.ad.trim() || !yon.soyad.trim()) { showToast('Ad ve soyad zorunludur', false); return; }
+      onSave({ ...data, yonetici: { ...yon } });
+      await saveYonetici(yon);
+      showToast('Yönetici bilgileri kaydedildi ✓');
+    } catch {
+      showToast('Yönetici bilgileri kaydedilemedi', false);
+    }
   }
 
   const ay = data.ayarlar;
@@ -34,10 +38,14 @@ export default function AyarlarPage({ data, onSave, showToast, onBackupAlindi }:
   const [ucretCimentoIndirme, setUcretCimentoIndirme] = useState(String(ay.ucretCimentoIndirme));
 
   async function ucretKaydet() {
-    const yeniAyarlar: Ayarlar = { ...ay, ucret10: parseFloat(ucret10)||0, ucret15: parseFloat(ucret15)||0, ucret20: parseFloat(ucret20)||0, ucretYukleme: parseFloat(ucretYukleme)||0, ucretBosaltma: parseFloat(ucretBosaltma)||0, ucretDama: parseFloat(ucretDama)||0, ucretCimento: parseFloat(ucretCimento)||0, ucretCimentoIndirme: parseFloat(ucretCimentoIndirme)||0 };
-    onSave({ ...data, ayarlar: yeniAyarlar });
-    await saveAyarlar(yeniAyarlar);
-    showToast('Ücret tarifeleri kaydedildi ✓');
+    try {
+      const yeniAyarlar: Ayarlar = { ...ay, ucret10: parseFloat(ucret10)||0, ucret15: parseFloat(ucret15)||0, ucret20: parseFloat(ucret20)||0, ucretYukleme: parseFloat(ucretYukleme)||0, ucretBosaltma: parseFloat(ucretBosaltma)||0, ucretDama: parseFloat(ucretDama)||0, ucretCimento: parseFloat(ucretCimento)||0, ucretCimentoIndirme: parseFloat(ucretCimentoIndirme)||0 };
+      onSave({ ...data, ayarlar: yeniAyarlar });
+      await saveAyarlar(yeniAyarlar);
+      showToast('Ücret tarifeleri kaydedildi ✓');
+    } catch {
+      showToast('Ücretler kaydedilemedi', false);
+    }
   }
 
   const fp = ay.fp;
@@ -49,10 +57,14 @@ export default function AyarlarPage({ data, onSave, showToast, onBackupAlindi }:
   const [fpKum, setFpKum]         = useState(String(fp.kum     ?? 0));
 
   async function fiyatKaydet() {
-    const yeniAyarlar: Ayarlar = { ...ay, fp: { merkez: parseFloat(fpMerkez)||0, yakin: parseFloat(fpYakin)||0, uzak: parseFloat(fpUzak)||0, yerinde: parseFloat(fpYerinde)||0, cimento: parseFloat(fpCimento)||0, kum: parseFloat(fpKum)||0 } };
-    onSave({ ...data, ayarlar: yeniAyarlar });
-    await saveAyarlar(yeniAyarlar);
-    showToast('Satış fiyatları kaydedildi ✓');
+    try {
+      const yeniAyarlar: Ayarlar = { ...ay, fp: { merkez: parseFloat(fpMerkez)||0, yakin: parseFloat(fpYakin)||0, uzak: parseFloat(fpUzak)||0, yerinde: parseFloat(fpYerinde)||0, cimento: parseFloat(fpCimento)||0, kum: parseFloat(fpKum)||0 } };
+      onSave({ ...data, ayarlar: yeniAyarlar });
+      await saveAyarlar(yeniAyarlar);
+      showToast('Satış fiyatları kaydedildi ✓');
+    } catch {
+      showToast('Fiyatlar kaydedilemedi', false);
+    }
   }
 
   const [micirFiyat, setMicirFiyat]     = useState(String(ay.micirFiyat));
@@ -60,21 +72,25 @@ export default function AyarlarPage({ data, onSave, showToast, onBackupAlindi }:
   const [kumFiyat, setKumFiyat]         = useState(String(ay.kumFiyat ?? 0));
 
   async function malzemeKaydet() {
-    const yeniAyarlar: Ayarlar = { ...ay, micirFiyat: parseFloat(micirFiyat)||0, cimentoFiyat: parseFloat(cimentoFiyat)||0, kumFiyat: parseFloat(kumFiyat)||0 };
-    onSave({ ...data, ayarlar: yeniAyarlar });
-    await saveAyarlar(yeniAyarlar);
-    showToast('Malzeme alış fiyatları kaydedildi ✓');
+    try {
+      const yeniAyarlar: Ayarlar = { ...ay, micirFiyat: parseFloat(micirFiyat)||0, cimentoFiyat: parseFloat(cimentoFiyat)||0, kumFiyat: parseFloat(kumFiyat)||0 };
+      onSave({ ...data, ayarlar: yeniAyarlar });
+      await saveAyarlar(yeniAyarlar);
+      showToast('Malzeme alış fiyatları kaydedildi ✓');
+    } catch {
+      showToast('Fiyatlar kaydedilemedi', false);
+    }
   }
 
   function jsonYedekAl() {
     try {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href = url; a.download = `briket-yedek-${new Date().toISOString().slice(0, 10)}.json`; a.click();
-      URL.revokeObjectURL(url);
-      backupTarihiGuncelle(); onBackupAlindi?.();
-      showToast('Yedek alındı ✓');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `briket-yedek-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    URL.revokeObjectURL(url);
+    backupTarihiGuncelle(); onBackupAlindi?.();
+    showToast('Yedek alındı ✓');
     } catch { showToast('Yedek alınamadı', false); }
   }
 
@@ -83,12 +99,12 @@ export default function AyarlarPage({ data, onSave, showToast, onBackupAlindi }:
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.target?.result as string);
-        if (!parsed.ayarlar || !parsed.isciler) throw new Error('Geçersiz yedek dosyası');
-        onSave(parsed);
-        showToast('Veri geri yüklendi ✓');
-      } catch { showToast('Yedek dosyası hatalı', false); }
+    try {
+    const parsed = JSON.parse(ev.target?.result as string);
+    if (!parsed.ayarlar || !parsed.isciler) throw new Error('Geçersiz yedek dosyası');
+    onSave(parsed);
+    showToast('Veri geri yüklendi ✓');
+    } catch { showToast('Yedek dosyası hatalı', false); }
     };
     reader.readAsText(file);
     e.target.value = '';

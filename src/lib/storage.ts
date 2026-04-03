@@ -452,7 +452,7 @@ export function isciToplamOdenen(isciId: number, data: AppData): number {
 export function tedarikciBorc(tedarikciId: number, data: AppData): { alinan: number; odenen: number; kalan: number } {
   const alinan = data.malzemeler.filter(m => m.tedarikciId === tedarikciId).reduce((s, m) => s + m.toplamTutar, 0);
   const odenen = data.tedarikOdemeler.filter(o => o.tedarikciId === tedarikciId).reduce((s, o) => s + o.tutar, 0);
-  return { alinan, odened: odenen, kalan: alinan - odenen } as { alinan: number; odened: number; kalan: number } as unknown as { alinan: number; odenen: number; kalan: number };
+  return { alinan, odenen, kalan: alinan - odenen };
 }
 
 export function stokHesapla(data: AppData): Record<'10luk' | '15lik' | '20lik', number> {

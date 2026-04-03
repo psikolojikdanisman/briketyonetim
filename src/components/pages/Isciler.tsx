@@ -34,12 +34,16 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
   const { bas, bit } = buHafta();
 
   async function isciEkle() {
-    if (!isim.trim()) { showToast('İsim gerekli', false); return; }
-    const yeni = { id: uid(), isim: isim.trim() };
-    onSave({ ...data, isciler: [...data.isciler, yeni] });
-    await saveIsci(yeni);
-    setIsim('');
-    showToast('İşçi eklendi');
+    try {
+      if (!isim.trim()) { showToast('İsim gerekli', false); return; }
+      const yeni = { id: uid(), isim: isim.trim() };
+      onSave({ ...data, isciler: [...data.isciler, yeni] });
+      await saveIsci(yeni);
+      setIsim('');
+      showToast('İşçi eklendi');
+    } catch {
+      showToast('İşçi eklenemedi', false);
+    }
   }
 
   function isciSilIste(id: number) {
@@ -56,19 +60,20 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
   }
 
   async function isciSilOnayla(id: number) {
-    const yeniUretimler  = data.uretimler.map(u => u.isciler.includes(id) ? { ...u, isciler: u.isciler.filter(x => x !== id) } : u);
-    const yeniYuklemeler = data.yuklemeler.map(y => y.isciler.includes(id) ? { ...y, isciler: y.isciler.filter(x => x !== id) } : y);
-    const silinecekAvanslar = data.avanslar.filter(a => a.isciId === id);
-
-    onSave({ ...data, isciler: data.isciler.filter(i => i.id !== id), avanslar: data.avanslar.filter(a => a.isciId !== id), uretimler: yeniUretimler, yuklemeler: yeniYuklemeler });
-
-    await deleteIsci(id);
-    await Promise.all(silinecekAvanslar.map(a => deleteAvans(a.id)));
-    await Promise.all(yeniUretimler.filter(u => u.isciler !== data.uretimler.find(x => x.id === u.id)?.isciler).map(saveUretim));
-    await Promise.all(yeniYuklemeler.filter(y => y.isciler !== data.yuklemeler.find(x => x.id === y.id)?.isciler).map(saveYukleme));
-
-    setSilOnay(null);
-    showToast('İşçi silindi');
+    try {
+      const yeniUretimler  = data.uretimler.map(u => u.isciler.includes(id) ? { ...u, isciler: u.isciler.filter(x => x !== id) } : u);
+      const yeniYuklemeler = data.yuklemeler.map(y => y.isciler.includes(id) ? { ...y, isciler: y.isciler.filter(x => x !== id) } : y);
+      const silinecekAvanslar = data.avanslar.filter(a => a.isciId === id);
+      onSave({ ...data, isciler: data.isciler.filter(i => i.id !== id), avanslar: data.avanslar.filter(a => a.isciId !== id), uretimler: yeniUretimler, yuklemeler: yeniYuklemeler });
+      await deleteIsci(id);
+      await Promise.all(silinecekAvanslar.map(a => deleteAvans(a.id)));
+      await Promise.all(yeniUretimler.filter(u => u.isciler !== data.uretimler.find(x => x.id === u.id)?.isciler).map(saveUretim));
+      await Promise.all(yeniYuklemeler.filter(y => y.isciler !== data.yuklemeler.find(x => x.id === y.id)?.isciler).map(saveYukleme));
+      setSilOnay(null);
+      showToast('İşçi silindi');
+    } catch {
+      showToast('İşçi silinemedi', false);
+    }
   }
 
   const isciKazanc = (isciId: number) => isciKazancAralik(isciId, bas, bit, data);
@@ -82,19 +87,23 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
   }
 
   async function avansKaydet() {
-    const id    = parseInt(avIsci);
-    const tutar = parseFloat(avTutar);
-    if (!id || !tutar) { showToast('İşçi ve tutar gerekli', false); return; }
-    const isci    = data.isciler.find(i => i.id === id);
-    const makbuzNo = `IP-${Date.now().toString(36).toUpperCase().slice(-6)}`;
-    const hk = isciKazanc(id); const ho = isciOdenen(id);
-    const tk = isciToplamKazanc(id, data); const to = isciToplamOdenen(id, data);
-    const yeniAvans = { id: uid(), isciId: id, tutar, tarih: avTarih || today(), aciklama: avAciklama };
-    onSave({ ...data, avanslar: [...data.avanslar, yeniAvans] });
-    await saveAvans(yeniAvans);
-    setSonOdeme({ isciId: id, isciIsim: isci?.isim || '?', tutar, tarih: avTarih || today(), aciklama: avAciklama, no: makbuzNo, haftaKazanc: hk.top, haftaOdenenOncesi: ho, tumKazanc: tk.top, tumOdenenOncesi: to });
-    setAvTutar(''); setAvAciklama('');
-    showToast('Ödeme kaydedildi ✓');
+    try {
+      const id    = parseInt(avIsci);
+      const tutar = parseFloat(avTutar);
+      if (!id || !tutar) { showToast('İşçi ve tutar gerekli', false); return; }
+      const isci    = data.isciler.find(i => i.id === id);
+      const makbuzNo = `IP-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+      const hk = isciKazanc(id); const ho = isciOdenen(id);
+      const tk = isciToplamKazanc(id, data); const to = isciToplamOdenen(id, data);
+      const yeniAvans = { id: uid(), isciId: id, tutar, tarih: avTarih || today(), aciklama: avAciklama };
+      onSave({ ...data, avanslar: [...data.avanslar, yeniAvans] });
+      await saveAvans(yeniAvans);
+      setSonOdeme({ isciId: id, isciIsim: isci?.isim || '?', tutar, tarih: avTarih || today(), aciklama: avAciklama, no: makbuzNo, haftaKazanc: hk.top, haftaOdenenOncesi: ho, tumKazanc: tk.top, tumOdenenOncesi: to });
+      setAvTutar(''); setAvAciklama('');
+      showToast('Ödeme kaydedildi ✓');
+    } catch {
+      showToast('Ödeme kaydedilemedi', false);
+    }
   }
 
   function isciMakbuzAc() {
@@ -118,8 +127,12 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
   }
 
   async function avSil(id: number) {
-    onSave({ ...data, avanslar: data.avanslar.filter(a => a.id !== id) });
-    await deleteAvans(id);
+    try {
+      onSave({ ...data, avanslar: data.avanslar.filter(a => a.id !== id) });
+      await deleteAvans(id);
+    } catch {
+      showToast('Ödeme silinemedi', false);
+    }
   }
 
   const isimStyle: React.CSSProperties = { cursor: 'pointer', color: 'var(--accent)', fontWeight: 600, textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 };

@@ -18,13 +18,17 @@ export default function KoylerPage({ data, onSave, showToast }: KoylerProps) {
   const [silOnay, setSilOnay] = useState<{ koyId: number; koyIsim: string; teslimatSayisi: number; spotSayisi: number } | null>(null);
 
   async function ekle() {
-    if (bolge !== 'merkez' && !isim.trim()) { showToast('Köy/Bölge adı gerekli', false); return; }
-    const yeniIsim = bolge === 'merkez' ? (isim.trim() || 'Merkez') : isim.trim();
-    const yeni: Koy = { id: uid(), isim: yeniIsim, bolge, not: notVal.trim() || undefined };
-    onSave({ ...data, koyler: [...data.koyler, yeni] });
-    await saveKoy(yeni);
-    setIsim(''); setNotVal('');
-    showToast('Köy/Bölge eklendi ✓');
+    try {
+      if (bolge !== 'merkez' && !isim.trim()) { showToast('Köy/Bölge adı gerekli', false); return; }
+      const yeniIsim = bolge === 'merkez' ? (isim.trim() || 'Merkez') : isim.trim();
+      const yeni: Koy = { id: uid(), isim: yeniIsim, bolge, not: notVal.trim() || undefined };
+      onSave({ ...data, koyler: [...data.koyler, yeni] });
+      await saveKoy(yeni);
+      setIsim(''); setNotVal('');
+      showToast('Köy/Bölge eklendi ✓');
+    } catch {
+      showToast('Köy eklenemedi', false);
+    }
   }
 
   function silIste(id: number) {
@@ -40,10 +44,14 @@ export default function KoylerPage({ data, onSave, showToast }: KoylerProps) {
   }
 
   async function silOnayla(id: number) {
-    onSave({ ...data, koyler: data.koyler.filter(k => k.id !== id) });
-    await deleteKoy(id);
-    setSilOnay(null);
-    showToast('Köy/Bölge silindi');
+    try {
+      onSave({ ...data, koyler: data.koyler.filter(k => k.id !== id) });
+      await deleteKoy(id);
+      setSilOnay(null);
+      showToast('Köy/Bölge silindi');
+    } catch {
+      showToast('Köy silinemedi', false);
+    }
   }
 
   const ozet = {
