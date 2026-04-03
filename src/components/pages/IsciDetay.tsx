@@ -137,6 +137,7 @@ export default function IsciDetay({ data, onSave, showToast, isciId, onGeri }: I
     const yeniAvans = { id: uid(), isciId, tutar, tarih: avTarih, aciklama: avAciklama };
     onSave({ ...data, avanslar: [...data.avanslar, yeniAvans] });
     await saveAvans(yeniAvans);
+    if (!isci) { showToast("İşçi bulunamadı", false); return; }
     setSonOdeme({ isciIsim: isci.isim, tutar, tarih: avTarih, aciklama: avAciklama, no: makbuzNo, haftaKazanc: hk.top, haftaOdenenOncesi: ho, tumKazanc: tk.top, tumOdenenOncesi: to });
     setAvTutar(''); setAvAciklama('');
     showToast('Ödeme kaydedildi ✓');

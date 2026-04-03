@@ -106,6 +106,117 @@ export async function saveYonetici(y: Yonetici): Promise<void> {
   await supabase.from('yonetici').upsert({ id: 'main', ad: y.ad, soyad: y.soyad, tel: y.tel, updated_at: new Date().toISOString() });
 }
 
+/**
+ * JSON yedekten geri yükleme — tüm tabloları Supabase'e toplu yazar.
+ */
+export async function topluGeriYukle(d: AppData): Promise<void> {
+  await saveAyarlar(d.ayarlar);
+  await saveYonetici(d.yonetici);
+
+  if (d.isciler.length)
+    await supabase.from('isciler').upsert(d.isciler.map(x => ({ id: x.id, isim: x.isim })));
+
+  if (d.uretimler.length)
+    await supabase.from('uretimler').upsert(d.uretimler.map(x => ({
+      id: x.id, tarih: x.tarih, cesit: x.cesit, miktar: x.miktar,
+      isciler: x.isciler, kisi_basi_ucret: x.kisiBasiUcret,
+      toplam_ucret: x.toplamUcret, not_: x.not,
+    })));
+
+  if (d.yuklemeler.length)
+    await supabase.from('yuklemeler').upsert(d.yuklemeler.map(x => ({
+      id: x.id, tarih: x.tarih, tur: x.tur, miktar: x.miktar,
+      isciler: x.isciler, kisi_basi_ucret: x.kisiBasiUcret,
+      toplam_ucret: x.toplamUcret, not_: x.not, yukleme_id: x.yuklemeId,
+    })));
+
+  if (d.avanslar.length)
+    await supabase.from('avanslar').upsert(d.avanslar.map(x => ({
+      id: x.id, isci_id: x.isciId, tutar: x.tutar, tarih: x.tarih, aciklama: x.aciklama,
+    })));
+
+  if (d.kapaliHaftalar.length)
+    await supabase.from('kapali_haftalar').upsert(d.kapaliHaftalar.map(x => ({
+      id: x.id, bas: x.bas, bit: x.bit, top_uretim: x.topUretim,
+      top_yukleme: x.topYukleme, isci_sayisi: x.isciSayisi, kapatma: x.kapatma,
+    })));
+
+  if (d.musteriler.length)
+    await supabase.from('musteriler').upsert(d.musteriler.map(x => ({
+      id: x.id, isim: x.isim, tel: x.tel, bolge: x.bolge, koy: x.koy, adres: x.adres,
+    })));
+
+  if (d.siparisler.length)
+    await supabase.from('siparisler').upsert(d.siparisler.map(x => ({
+      id: x.id, musteri_id: x.musteriId, adet: x.adet, gonderilen: x.gonderilen,
+      cesit: x.cesit, bolge: x.bolge, koy: x.koy, adres: x.adres,
+      fiyat: x.fiyat, toplam_tutar: x.toplamTutar, birim: x.birim,
+      tarih: x.tarih, not_: x.not, oncelik: x.oncelik,
+    })));
+
+  if (d.teslimatlar.length)
+    await supabase.from('teslimatlar').upsert(d.teslimatlar.map(x => ({
+      id: x.id, siparis_id: x.siparisId, musteri_id: x.musteriId,
+      cesit: x.cesit, bolge: x.bolge, koy: x.koy, adres: x.adres,
+      birim_fiyat: x.birimFiyat, adet: x.adet, tutar: x.tutar,
+      tahsil: x.tahsil, odeme_durumu: x.odemeDurumu, tarih: x.tarih,
+      not_: x.not, birim: x.birim,
+    })));
+
+  if (d.gecmisBorclar?.length)
+    await supabase.from('gecmis_borclar').upsert(d.gecmisBorclar.map(x => ({
+      id: x.id, musteri_id: x.musteriId, tutar: x.tutar,
+      tarih: x.tarih, aciklama: x.aciklama, detay: x.detay,
+    })));
+
+  if (d.musteriOdemeler.length)
+    await supabase.from('musteri_odemeler').upsert(d.musteriOdemeler.map(x => ({
+      id: x.id, musteri_id: x.musteriId, tutar: x.tutar, tarih: x.tarih, aciklama: x.aciklama,
+    })));
+
+  if (d.malzemeler.length)
+    await supabase.from('malzemeler').upsert(d.malzemeler.map(x => ({
+      id: x.id, tur: x.tur, tarih: x.tarih, tirlar: x.tirlar,
+      toplam_miktar: x.toplamMiktar, toplam_tutar: x.toplamTutar,
+      tedarikci: x.tedarikci, tedarikci_id: x.tedarikciId,
+      gecmis_borc_mu: x.gecmisBorcMu, not_: x.not,
+    })));
+
+  if (d.tedarikOdemeler.length)
+    await supabase.from('tedarik_odemeler').upsert(d.tedarikOdemeler.map(x => ({
+      id: x.id, tedarikci_id: x.tedarikciId, tutar: x.tutar, tarih: x.tarih, aciklama: x.aciklama,
+    })));
+
+  if (d.tedarikciListesi.length)
+    await supabase.from('tedarikci_listesi').upsert(d.tedarikciListesi.map(x => ({
+      id: x.id, isim: x.isim, tur: x.tur,
+    })));
+
+  if (d.koyler.length)
+    await supabase.from('koyler').upsert(d.koyler.map(x => ({
+      id: x.id, isim: x.isim, bolge: x.bolge, not_: x.not,
+    })));
+
+  if (d.spotSatislar.length)
+    await supabase.from('spot_satislar').upsert(d.spotSatislar.map(x => ({
+      id: x.id, musteri_id: x.musteriId, tarih: x.tarih, cesit: x.cesit,
+      adet: x.adet, birim_fiyat: x.birimFiyat, tutar: x.tutar, tahsil: x.tahsil,
+      konum: x.konum, koy: x.koy, adres: x.adres, bolge: x.bolge, not_: x.not, birim: x.birim,
+    })));
+
+  if (d.spotOdemeler.length)
+    await supabase.from('spot_odemeler').upsert(d.spotOdemeler.map(x => ({
+      id: x.id, musteri_id: x.musteriId, tutar: x.tutar, tarih: x.tarih, aciklama: x.aciklama,
+    })));
+
+  if (d.giderler.length)
+    await supabase.from('giderler').upsert(d.giderler.map(x => ({
+      id: x.id, tarih: x.tarih, kategori: x.kategori,
+      kategori_isim: x.kategoriIsim, tutar: x.tutar, aciklama: x.aciklama,
+    })));
+}
+
+
 export async function saveIsci(isci: Isci): Promise<void> {
   await supabase.from('isciler').upsert({ id: isci.id, isim: isci.isim });
 }

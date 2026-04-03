@@ -8,6 +8,7 @@ interface MakbuzParams {
   makbuzNo: string;
   tarih: string;
   alici: string;
+  aliciTel?: string;
   aciklama?: string;
   kalemler: MakbuzKalem[];
   odemeTutari: string;
@@ -16,7 +17,7 @@ interface MakbuzParams {
 }
 
 export function makbuzIndir({
-  baslik, makbuzNo, tarih, alici, aciklama,
+  baslik, makbuzNo, tarih, alici, aliciTel, aciklama,
   kalemler, odemeTutari, kalanBorc, isletmeAdi,
 }: MakbuzParams) {
   const fd = (d: string) => d.split('-').reverse().join('.');
@@ -44,6 +45,7 @@ export function makbuzIndir({
     .alici { background:#f7f7f7; border-radius:6px; padding:12px 16px; margin-bottom:20px; }
     .alici-label { font-size:10px; color:#999; letter-spacing:1px; margin-bottom:4px; }
     .alici-isim { font-size:16px; font-weight:700; }
+    .alici-tel { font-size:12px; color:#555; margin-top:3px; }
     table { width:100%; border-collapse:collapse; margin-bottom:16px; }
     .tutar-kutu { background:#111; color:#fff; border-radius:6px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
     .tutar-label { font-size:11px; opacity:.7; letter-spacing:1px; }
@@ -68,6 +70,7 @@ export function makbuzIndir({
   <div class="alici">
     <div class="alici-label">ALICI</div>
     <div class="alici-isim">${alici}</div>
+    ${aliciTel ? `<div class="alici-tel">📞 ${aliciTel}</div>` : ''}
     ${aciklama ? `<div style="font-size:12px;color:#666;margin-top:4px;">${aciklama}</div>` : ''}
   </div>
 

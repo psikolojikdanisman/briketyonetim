@@ -248,7 +248,7 @@ export default function Dashboard({ data }: DashboardProps) {
   type ChartConstructor = new (ctx: HTMLCanvasElement, config: unknown) => ChartInstance;
 
   function drawCharts() {
-    const Chart = (window as Record<string, unknown>).Chart as ChartConstructor | undefined;
+    const Chart = (window as unknown as Record<string, unknown>).Chart as ChartConstructor | undefined;
     if (!Chart) return;
 
     // Destroy existing

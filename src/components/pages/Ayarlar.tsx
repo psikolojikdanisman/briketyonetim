@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
 import type { AppData, Ayarlar, Yonetici } from '@/types';
-import { backupTarihiGuncelle, saveAyarlar, saveYonetici } from '@/lib/storage';
+import { backupTarihiGuncelle, saveAyarlar, saveYonetici, topluGeriYukle } from '@/lib/storage';
+import { supabase } from '@/lib/supabase';
 
 interface AyarlarProps {
   data: AppData;
@@ -98,23 +99,37 @@ export default function AyarlarPage({ data, onSave, showToast, onBackupAlindi }:
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-    try {
-    const parsed = JSON.parse(ev.target?.result as string);
-    if (!parsed.ayarlar || !parsed.isciler) throw new Error('Geçersiz yedek dosyası');
-    onSave(parsed);
-    showToast('Veri geri yüklendi ✓');
-    } catch { showToast('Yedek dosyası hatalı', false); }
+    reader.onload = async (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string);
+        if (!parsed.ayarlar || !parsed.isciler) throw new Error('Geçersiz yedek dosyası');
+        onSave(parsed);
+        await topluGeriYukle(parsed);
+        showToast('Veri geri yüklendi ve Supabase\'e yazıldı ✓');
+      } catch {
+        showToast('Yedek dosyası hatalı veya yazılamadı', false);
+      }
     };
     reader.readAsText(file);
     e.target.value = '';
   }
 
-  function tumVeriSil() {
+  async function tumVeriSil() {
     if (!confirm('TÜM VERİ SİLİNECEK. Bu işlem geri alınamaz. Emin misiniz?')) return;
     if (!confirm('Son kez onay: Tüm kayıtlar, müşteriler, işçiler silinecek. Devam?')) return;
-    localStorage.removeItem('byk_v3');
-    window.location.reload();
+    try {
+      const tablolar = [
+        'uretimler', 'yuklemeler', 'avanslar', 'kapali_haftalar',
+        'siparisler', 'teslimatlar', 'gecmis_borclar', 'musteri_odemeler',
+        'musteriler', 'malzemeler', 'tedarik_odemeler', 'tedarikci_listesi',
+        'koyler', 'spot_satislar', 'spot_odemeler', 'giderler', 'isciler',
+      ];
+      await Promise.all(tablolar.map(t => supabase.from(t).delete().neq('id', -999999)));
+      localStorage.removeItem('byk_v3');
+      window.location.reload();
+    } catch {
+      showToast('Veriler silinemedi, tekrar deneyin', false);
+    }
   }
 
   const sekmeler: { key: Sekme; label: string; icon: string }[] = [

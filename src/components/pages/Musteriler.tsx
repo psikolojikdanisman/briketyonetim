@@ -163,7 +163,6 @@ export default function MusterilerPage({ data, onSave, showToast }: MusterilerPr
     makbuzNo: sonOdeme.no,
     tarih: sonOdeme.tarih,
     alici: sonOdeme.musteriIsim,
-    aliciTel: sonOdeme.musteriTel || undefined,
     aciklama: sonOdeme.aciklama || undefined,
     kalemler: [
       { etiket: 'Odeme Tarihi',         deger: sonOdeme.tarih.split('-').reverse().join('.') },

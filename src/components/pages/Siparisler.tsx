@@ -9,7 +9,7 @@ function varsayilanFiyat(cesit: string, bolge: string, data: AppData): string {
   const fp = data.ayarlar?.fp;
   if (!fp) return '';
   const b = (bolge === 'merkez' || bolge === 'yakin') ? bolge : 'merkez';
-  const fpAsAny = fp as Record<string, number>;
+  const fpAsAny = fp as unknown as Record<string, number>;
   const val = fpAsAny[b];
   return val ? String(val) : '';
 }
