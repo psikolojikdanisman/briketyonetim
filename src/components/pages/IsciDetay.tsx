@@ -166,7 +166,7 @@ export default function IsciDetay({ data, onSave, showToast, isciId, onGeri }: I
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
         <button className="btn btn-secondary" onClick={onGeri} style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'IBM Plex Mono, monospace', fontSize: 12 }}>← Geri</button>
         <div>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 1, color: 'var(--text)' }}>{isci.isim}</div>
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 1, color: 'var(--text)' }}>{isci?.isim}</div>
           <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: 1 }}>İŞÇİ PROFİLİ</div>
         </div>
       </div>
