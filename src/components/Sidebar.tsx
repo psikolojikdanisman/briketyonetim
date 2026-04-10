@@ -4,6 +4,7 @@ import type { PageKey } from '@/types';
 interface SidebarProps {
   activePage: PageKey;
   onNavigate: (page: PageKey) => void;
+  acik?: boolean;
 }
 
 const NAV_ITEMS: {
@@ -93,7 +94,7 @@ function IdoogluLogo({ className }: { className?: string }) {
   );
 }
 
-export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
+export default function Sidebar({ activePage, onNavigate, acik }: SidebarProps) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('tr-TR', {
     day: '2-digit',
@@ -105,7 +106,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const effectivePage = activePage === 'isci-detay' ? 'isciler' : activePage;
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${acik ? ' open' : ''}`}>
       {/* Logo */}
       <div className="logo">
         <IdoogluLogo className="logo-svg" />

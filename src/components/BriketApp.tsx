@@ -42,6 +42,7 @@ export default function BriketApp() {
   const [dateStr, setDateStr]             = useState('');
   const [backupUyari, setBackupUyari]               = useState(false);
   const [backupBannerKapali, setBackupBannerKapali] = useState(false);
+  const [sidebarAcik, setSidebarAcik]               = useState(false);
 
   // ── Auth durumunu kontrol et ──────────────────────────────────────────────
   useEffect(() => {
@@ -237,7 +238,7 @@ export default function BriketApp() {
 
   return (
     <div className="layout">
-      <Sidebar activePage={page} onNavigate={handleNavigate} />
+      <Sidebar activePage={page} onNavigate={(p) => { handleNavigate(p); setSidebarAcik(false); }} acik={sidebarAcik} />
       <div className="main">
 
         {/* Backup uyarı banner */}
@@ -275,7 +276,10 @@ export default function BriketApp() {
 
         {/* Topbar */}
         <div className="topbar">
-          <div className="topbar-title">{topbarTitle}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={() => setSidebarAcik(v => !v)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '4px 10px', fontSize: 18, cursor: 'pointer', display: 'none' }} className="mobil-menu-btn">☰</button>
+            <div className="topbar-title">{topbarTitle}</div>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div className="date-badge">{dateStr}</div>
             <button

@@ -584,6 +584,63 @@ tr:hover td { background: rgba(45,122,79,0.04); color: var(--text); }
 .haftalik-table .isci-col { min-width: 120px; font-weight: 600; color: var(--text); font-size: 13px; }
 .haftalik-table .total-col { font-weight: 700; font-family: 'JetBrains Mono', monospace; }
 
+/* ─── MOBİL ─── */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 200;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main {
+    margin-left: 0;
+  }
+
+  .topbar {
+    padding: 0 16px;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .three-col {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .frow.c2 {
+    grid-template-columns: 1fr;
+  }
+
+  .frow.c3 {
+    grid-template-columns: 1fr;
+  }
+
+  .frow.c4 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  .mobil-menu-btn {
+    display: block !important;
+  }
+}
+
 /* ─── SCROLLBAR ─── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--surface2); }
