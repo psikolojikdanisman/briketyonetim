@@ -82,14 +82,6 @@ export default function IsciDetay({ data, onSave, showToast, isciId, onGeri }: I
   const { bas, bit } = buHafta();
   const isci = data.isciler.find(i => i.id === isciId);
 
-  if (!isci) return (
-    <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>
-      <div style={{ fontSize: 40, marginBottom: 16 }}>⚠️</div>
-      <div>İşçi bulunamadı.</div>
-      <button className="btn btn-secondary" style={{ marginTop: 20 }} onClick={onGeri}>← Geri Dön</button>
-    </div>
-  );
-
   const tk = useMemo(() => {
     const ure = data.uretimler.filter(u => u.isciler.includes(isciId)).reduce((s, u) => s + u.kisiBasiUcret, 0);
     const yuk = data.yuklemeler.filter(y => y.isciler.includes(isciId)).reduce((s, y) => s + y.kisiBasiUcret, 0);

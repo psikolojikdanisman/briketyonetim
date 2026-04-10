@@ -1,3 +1,4 @@
+
 import type { AppData, Ayarlar, Isci, Uretim, Yukleme, Avans, KapaliHafta, Musteri, Siparis, Teslimat, GecmisBorc, MusteriOdeme, Malzeme, TedarikOdeme, Tedarikci, Koy, SpotSatis, SpotOdeme, Gider, Yonetici } from '@/types';
 import { supabase } from './supabase';
 
@@ -139,39 +140,39 @@ export async function loadDataFromSupabase(): Promise<AppData> {
   return {
     yonetici,
     ayarlar,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     isciler:          (iscilerRaw    as any[]).map(mapIsci),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     uretimler:        (uretimlerRaw  as any[]).map(mapUretim),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     yuklemeler:       (yuklemelerRaw as any[]).map(mapYukleme),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     avanslar:         (avanslarRaw   as any[]).map(mapAvans),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     kapaliHaftalar:   (kapaliRaw     as any[]).map(mapKapaliHafta),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     musteriler:       (musterilerRaw as any[]).map(mapMusteri),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     siparisler:       (siparislerRaw as any[]).map(mapSiparis),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     teslimatlar:      (teslimatlarRaw as any[]).map(mapTeslimat),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     gecmisBorclar:    (gecmisRaw     as any[]).map(mapGecmisBorc),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     musteriOdemeler:  (musteriOdRaw  as any[]).map(mapMusteriOdeme),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     malzemeler:       (malzemeRaw    as any[]).map(mapMalzeme),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     tedarikOdemeler:  (tedarikOdRaw  as any[]).map(mapTedarikOdeme),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     tedarikciListesi: (tedarikciRaw  as any[]).map(mapTedarikci),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     koyler:           (koylerRaw     as any[]).map(mapKoy),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     spotSatislar:     (spotSatisRaw  as any[]).map(mapSpotSatis),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     spotOdemeler:     (spotOdRaw     as any[]).map(mapSpotOdeme),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    
     giderler:         (giderlerRaw   as any[]).map(mapGider),
   };
 }
@@ -500,71 +501,71 @@ export async function deleteGider(id: number): Promise<void> {
 
 // ─── MAP FONKSİYONLARI ────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapIsci(r: any): Isci {
   return { id: r.id, isim: r.isim };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapUretim(r: any): Uretim {
   return { id: r.id, tarih: r.tarih, cesit: r.cesit, miktar: r.miktar, isciler: r.isciler || [], kisiBasiUcret: r.kisi_basi_ucret, toplamUcret: r.toplam_ucret, not: r.not_ };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapYukleme(r: any): Yukleme {
   return { id: r.id, tarih: r.tarih, tur: r.tur, miktar: r.miktar, isciler: r.isciler || [], kisiBasiUcret: r.kisi_basi_ucret, toplamUcret: r.toplam_ucret, not: r.not_, yuklemeId: r.yukleme_id };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapAvans(r: any): Avans {
   return { id: r.id, isciId: r.isci_id, tutar: r.tutar, tarih: r.tarih, aciklama: r.aciklama };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapKapaliHafta(r: any): KapaliHafta {
   return { id: r.id, bas: r.bas, bit: r.bit, topUretim: r.top_uretim, topYukleme: r.top_yukleme, isciSayisi: r.isci_sayisi, kapatma: r.kapatma };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapMusteri(r: any): Musteri {
   return { id: r.id, isim: r.isim, tel: r.tel, bolge: r.bolge, koy: r.koy, adres: r.adres };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapSiparis(r: any): Siparis {
   return { id: r.id, musteriId: r.musteri_id, adet: r.adet, gonderilen: r.gonderilen, cesit: r.cesit, bolge: r.bolge, koy: r.koy, adres: r.adres, fiyat: r.fiyat, toplamTutar: r.toplam_tutar, birim: r.birim, tarih: r.tarih, not: r.not_, oncelik: r.oncelik };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapTeslimat(r: any): Teslimat {
   return { id: r.id, siparisId: r.siparis_id, musteriId: r.musteri_id, cesit: r.cesit, bolge: r.bolge, koy: r.koy, adres: r.adres, birimFiyat: r.birim_fiyat, adet: r.adet, tutar: r.tutar, tahsil: r.tahsil, odemeDurumu: r.odeme_durumu, tarih: r.tarih, not: r.not_, birim: r.birim };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapGecmisBorc(r: any): GecmisBorc {
   return { id: r.id, musteriId: r.musteri_id, tutar: r.tutar, tarih: r.tarih, aciklama: r.aciklama, detay: r.detay };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapMusteriOdeme(r: any): MusteriOdeme {
   return { id: r.id, musteriId: r.musteri_id, tutar: r.tutar, tarih: r.tarih, aciklama: r.aciklama };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapMalzeme(r: any): Malzeme {
   return { id: r.id, tur: r.tur, tarih: r.tarih, tirlar: r.tirlar || [], toplamMiktar: r.toplam_miktar, toplamTutar: r.toplam_tutar, tedarikci: r.tedarikci, tedarikciId: r.tedarikci_id, gecmisBorcMu: r.gecmis_borc_mu, not: r.not_ };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapTedarikOdeme(r: any): TedarikOdeme {
   return { id: r.id, tedarikciId: r.tedarikci_id, tutar: r.tutar, tarih: r.tarih, aciklama: r.aciklama };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapTedarikci(r: any): Tedarikci {
   return { id: r.id, isim: r.isim, tur: r.tur };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapKoy(r: any): Koy {
   return { id: r.id, isim: r.isim, bolge: r.bolge, not: r.not_ };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapSpotSatis(r: any): SpotSatis {
   return { id: r.id, musteriId: r.musteri_id, tarih: r.tarih, cesit: r.cesit, adet: r.adet, birimFiyat: r.birim_fiyat, tutar: r.tutar, tahsil: r.tahsil, konum: r.konum, koy: r.koy, adres: r.adres, bolge: r.bolge, not: r.not_, birim: r.birim };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapSpotOdeme(r: any): SpotOdeme {
   return { id: r.id, musteriId: r.musteri_id, tutar: r.tutar, tarih: r.tarih, aciklama: r.aciklama };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function mapGider(r: any): Gider {
   return { id: r.id, tarih: r.tarih, kategori: r.kategori, kategoriIsim: r.kategori_isim, tutar: r.tutar, aciklama: r.aciklama };
 }

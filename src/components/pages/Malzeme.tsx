@@ -240,6 +240,7 @@ export default function MalzemePage({ data, onSave, showToast }: MalzemeProps) {
       if (mevcut) return prev;
       return varsayilanTedarikci(data, tur);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.tedarikciListesi, tur]);
 
   function tirEkle() { setTirlar(t => [...t, { miktar: '', fiyat: String(tarife || '') }]); }
