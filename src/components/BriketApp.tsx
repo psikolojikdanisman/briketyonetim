@@ -112,6 +112,11 @@ export default function BriketApp() {
       .then(yuklenenData => {
         setData(yuklenenData);
         setVeriDurum('yuklendi');
+        setDateStr(
+          new Date().toLocaleDateString('tr-TR', {
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+          })
+        );
       })
       .catch((hata: unknown) => {
         setVeriDurum('hata');
