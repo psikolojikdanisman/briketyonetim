@@ -36,29 +36,30 @@ export function makbuzIndir({
   <title>${baslik}</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Segoe UI',Arial,sans-serif; font-size:13px; color:#111; padding:32px; max-width:600px; margin:auto; }
+    @page { size: A6; margin: 8mm; }
+    body { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#000; padding:0; max-width:105mm; margin:auto; }
     .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; padding-bottom:16px; border-bottom:2px solid #222; }
     .firma { font-size:18px; font-weight:700; letter-spacing:1px; }
-    .firma-alt { font-size:11px; color:#777; margin-top:3px; }
+    .firma-alt { font-size:10px; color:#333; margin-top:3px; font-weight:600; }
     .makbuz-no { text-align:right; font-size:11px; color:#777; }
     .makbuz-no strong { font-size:15px; color:#111; display:block; margin-bottom:2px; }
     .alici { background:#f7f7f7; border-radius:6px; padding:12px 16px; margin-bottom:20px; }
-    .alici-label { font-size:10px; color:#999; letter-spacing:1px; margin-bottom:4px; }
-    .alici-isim { font-size:16px; font-weight:700; }
-    .alici-tel { font-size:12px; color:#555; margin-top:3px; }
+    .alici-label { font-size:10px; color:#333; letter-spacing:1px; margin-bottom:4px; font-weight:700; }
+    .alici-isim { font-size:13px; font-weight:900; color:#000; }
+    .alici-tel { font-size:11px; color:#333; margin-top:3px; font-weight:600; }
     table { width:100%; border-collapse:collapse; margin-bottom:16px; }
     .tutar-kutu { background:#111; color:#fff; border-radius:6px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
     .tutar-label { font-size:11px; opacity:.7; letter-spacing:1px; }
     .tutar-rakam { font-size:22px; font-weight:700; font-family:monospace; }
     .kalan { background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:10px 14px; font-size:12px; margin-bottom:16px; display:flex; justify-content:space-between; }
-    .footer { border-top:1px dashed #ccc; padding-top:12px; font-size:10px; color:#aaa; text-align:center; margin-top:8px; }
+    .footer { border-top:1px dashed #666; padding-top:8px; font-size:9px; color:#333; text-align:center; margin-top:6px; }
     @media print { body { padding:16px; } }
   </style>
 </head>
 <body>
   <div class="header">
     <div>
-      <div class="firma">🧱 ${isletmeAdi || 'BRİKET YÖNETİM'}</div>
+      <div class="firma" style="font-size:13px;font-weight:900;color:#000;letter-spacing:1px;">İDOOĞLU BRİKET</div>
       <div class="firma-alt">${baslik}</div>
     </div>
     <div class="makbuz-no">

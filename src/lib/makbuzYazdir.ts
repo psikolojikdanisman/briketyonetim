@@ -40,25 +40,26 @@ export function makbuzYazdir({ musteriIsim, kalemler, tarih, yoneticiAdSoyad, yo
   <title>Teslimat Makbuzu — ${musteriIsim}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #111; padding: 32px; max-width: 700px; margin: auto; }
+    @page { size: A6; margin: 8mm; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #000; padding: 0; max-width: 105mm; margin: auto; }
     .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #222; }
     .firma { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
     .firma-alt { font-size: 12px; color: #555; margin-top: 4px; }
     .makbuz-no { text-align: right; font-size: 12px; color: #555; }
     .makbuz-no strong { font-size: 16px; color: #111; display: block; }
     .bilgi { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; padding: 14px 16px; background: #f7f7f7; border-radius: 6px; }
-    .bilgi-satir label { font-size: 11px; color: #777; display: block; margin-bottom: 2px; }
-    .bilgi-satir span { font-size: 13px; font-weight: 600; }
+    .bilgi-satir label { font-size: 10px; color: #333; display: block; margin-bottom: 2px; font-weight: 700; }
+    .bilgi-satir span { font-size: 11px; font-weight: 700; color: #000; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
     th { background: #222; color: #fff; padding: 8px 10px; font-size: 12px; text-align: left; }
     th.r, td.r { text-align: right; }
-    td { padding: 8px 10px; border-bottom: 1px solid #e5e5e5; font-size: 12px; }
+    td { padding: 5px 8px; border-bottom: 1px solid #ccc; font-size: 10px; color: #000; }
     tr:last-child td { border-bottom: none; }
     .ozet { margin-left: auto; width: 260px; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; margin-bottom: 24px; }
     .ozet-satir { display: flex; justify-content: space-between; padding: 7px 14px; font-size: 13px; border-bottom: 1px solid #eee; }
     .ozet-satir:last-child { border-bottom: none; background: #f0f0f0; font-weight: 700; }
     .ozet-satir.kalan { color: ${toplamKalan > 0 ? '#c0392b' : '#27ae60'}; }
-    .footer { border-top: 1px dashed #bbb; padding-top: 14px; font-size: 11px; color: #777; text-align: center; margin-top: 8px; }
+    .footer { border-top: 1px dashed #666; padding-top: 8px; font-size: 9px; color: #333; text-align: center; margin-top: 6px; }
     @media print {
       body { padding: 16px; }
       button { display: none; }
@@ -68,8 +69,8 @@ export function makbuzYazdir({ musteriIsim, kalemler, tarih, yoneticiAdSoyad, yo
 <body>
   <div class="header">
     <div>
-      <div class="firma">🧱 BRİKET YÖNETİM</div>
-      <div class="firma-alt">${yoneticiAdSoyad}${yoneticiTel ? ' · ' + yoneticiTel : ''}</div>
+      <div class="firma" style="font-size:13px;font-weight:900;color:#000;letter-spacing:1px;">İDOOĞLU BRİKET</div>
+      <div class="firma-alt" style="font-size:10px;color:#333;margin-top:2px;">${yoneticiAdSoyad}${yoneticiTel ? ' · ' + yoneticiTel : ''}</div>
     </div>
     <div class="makbuz-no">
       <strong>TESLİMAT MAKBUZU</strong>
