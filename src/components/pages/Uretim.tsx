@@ -17,7 +17,9 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
   const [not, setNot] = useState('');
   const [errors, setErrors] = useState<{ miktar?: boolean; isciler?: boolean }>({});
 
-  const toplamUcret = birimUcret(cesit, data.ayarlar) * (parseFloat(miktar) || 0);
+  const TAHTA_CARPAN: Record<string, number> = { '10luk': 7, '15lik': 5, '20lik': 4 };
+  const hesaplananAdet = (parseFloat(miktar) || 0) * (TAHTA_CARPAN[cesit] || 1);
+  const toplamUcret = birimUcret(cesit, data.ayarlar) * hesaplananAdet;
   const kisiBasiUcret = seciliIsciler.length > 0 ? toplamUcret / seciliIsciler.length : 0;
 
   function toggleIsci(id: number) {
@@ -32,7 +34,7 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
       setErrors(newErrors);
       if (newErrors.miktar) { showToast('Miktar gerekli', false); return; }
       if (newErrors.isciler) { showToast('En az 1 işçi seçin', false); return; }
-      const yeni: Uretim = { id: uid(), tarih, cesit, miktar: m, isciler: seciliIsciler, kisiBasiUcret, toplamUcret, not };
+      const yeni: Uretim = { id: uid(), tarih, cesit, miktar: hesaplananAdet, isciler: seciliIsciler, kisiBasiUcret, toplamUcret, not };
       const newData = { ...data, uretimler: [...data.uretimler, yeni] };
       onSave(newData);
       await saveUretim(yeni);
@@ -54,8 +56,43 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
   }
 
   const showCalc = parseFloat(miktar) > 0 && seciliIsciler.length > 0;
+  const [detayKayit, setDetayKayit] = useState<typeof data.uretimler[0] | null>(null);
 
   return (
+    <div>
+    {detayKayit && (
+      <div className="modal-overlay open">
+        <div className="modal" style={{ maxWidth: 420 }}>
+          <div className="modal-title">Üretim Detayı</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text3)' }}>Tarih</span><span style={{ fontWeight: 600 }}>{fd(detayKayit.tarih)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text3)' }}>Çeşit</span><span style={{ fontWeight: 600 }}>{detayKayit.cesit}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text3)' }}>Tahta Sayısı</span><span style={{ fontWeight: 600 }}>{TAHTA_CARPAN[detayKayit.cesit] ? Math.round(detayKayit.miktar / TAHTA_CARPAN[detayKayit.cesit]) : '—'} tahta</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text3)' }}>Toplam Üretim</span><span style={{ fontWeight: 600 }}>{detayKayit.miktar.toLocaleString('tr-TR')} adet</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text3)' }}>Kişi Başı Ücret</span><span style={{ fontWeight: 600 }}>{tl(detayKayit.kisiBasiUcret)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text3)' }}>Toplam Ücret</span><span style={{ fontWeight: 600 }}>{tl(detayKayit.toplamUcret)}</span></div>
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+              <div style={{ color: 'var(--text3)', marginBottom: 6 }}>İşçiler</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {detayKayit.isciler.map(id => {
+                  const isci = data.isciler.find(i => i.id === id);
+                  return <span key={id} className="badge b-green">{isci?.isim || '?'}</span>;
+                })}
+              </div>
+            </div>
+            {detayKayit.not && (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                <div style={{ color: 'var(--text3)', marginBottom: 4 }}>Not</div>
+                <div style={{ fontSize: 13, color: 'var(--text)' }}>{detayKayit.not}</div>
+              </div>
+            )}
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={() => setDetayKayit(null)}>Kapat</button>
+          </div>
+        </div>
+      </div>
+    )}
     <div className="two-col">
       <div className="panel">
         <div className="panel-header"><div className="panel-title">Günlük Üretim Girişi</div></div>
@@ -76,8 +113,8 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
           </div>
           <div className="frow">
             <div>
-              <label>Üretim Miktarı (adet)</label>
-              <input type="number" min="1" placeholder="ör: 3500" value={miktar}
+              <label>Tahta Sayısı</label>
+              <input type="number" min="1" placeholder="ör: 10" value={miktar}
                 onChange={e => { setMiktar(e.target.value); if (errors.miktar) setErrors(er => ({ ...er, miktar: false })); }}
                 style={{ borderColor: errors.miktar ? 'var(--red)' : undefined }} />
               {errors.miktar && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>Geçerli bir miktar girin</div>}
@@ -100,7 +137,9 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
           </div>
           {showCalc && (
             <div className="calc-preview">
-              <div className="calc-row"><span>Toplam üretim</span><span>{parseFloat(miktar).toLocaleString('tr-TR')} adet</span></div>
+              <div className="calc-row"><span>Tahta sayısı</span><span>{parseFloat(miktar).toLocaleString('tr-TR')} tahta</span></div>
+              <div className="calc-row"><span>Tahta çarpanı</span><span>{TAHTA_CARPAN[cesit]} adet/tahta</span></div>
+              <div className="calc-row"><span>Toplam üretim</span><span>{hesaplananAdet.toLocaleString('tr-TR')} adet</span></div>
               <div className="calc-row"><span>Birim ücret (tarife)</span><span>{birimUcret(cesit, data.ayarlar).toFixed(3)} TL/adet</span></div>
               <div className="calc-row"><span>Toplam ücret havuzu</span><span>{tl(toplamUcret)}</span></div>
               <div className="calc-row"><span>Çalışan işçi sayısı</span><span>{seciliIsciler.length} kişi</span></div>
@@ -131,7 +170,7 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
                 ) : [...data.uretimler].sort((a, b) => b.tarih.localeCompare(a.tarih)).map(u => {
                   const isciAdlari = u.isciler.map(id => data.isciler.find(i => i.id === id)?.isim || '?').join(', ');
                   return (
-                    <tr key={u.id}>
+                    <tr key={u.id} onClick={() => setDetayKayit(u)} style={{ cursor: 'pointer' }}>
                       <td>{fd(u.tarih)}</td>
                       <td><span className="badge b-yellow">{u.cesit}</span></td>
                       <td className="td-mono">{u.miktar.toLocaleString('tr-TR')}</td>
@@ -147,6 +186,7 @@ export default function UretimPage({ data, onSave, showToast }: UretimProps) {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

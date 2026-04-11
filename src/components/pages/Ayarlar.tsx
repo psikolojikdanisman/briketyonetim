@@ -29,8 +29,9 @@ export default function AyarlarPage({ data, onSave, showToast, onBackupAlindi }:
   }
 
   const ay = data.ayarlar;
-  const [ucret10, setUcret10]                         = useState(String(ay.ucret10));
-  const [ucret15, setUcret15]                         = useState(String(ay.ucret15));
+  const [ucretUretim, setUcretUretim]                 = useState(String(ay.ucret20));
+  const [ucret10, setUcret10]                         = useState(String(ay.ucret20));
+  const [ucret15, setUcret15]                         = useState(String(ay.ucret20));
   const [ucret20, setUcret20]                         = useState(String(ay.ucret20));
   const [ucretYukleme, setUcretYukleme]               = useState(String(ay.ucretYukleme));
   const [ucretBosaltma, setUcretBosaltma]             = useState(String(ay.ucretBosaltma));
@@ -40,7 +41,7 @@ export default function AyarlarPage({ data, onSave, showToast, onBackupAlindi }:
 
   async function ucretKaydet() {
     try {
-      const yeniAyarlar: Ayarlar = { ...ay, ucret10: parseFloat(ucret10)||0, ucret15: parseFloat(ucret15)||0, ucret20: parseFloat(ucret20)||0, ucretYukleme: parseFloat(ucretYukleme)||0, ucretBosaltma: parseFloat(ucretBosaltma)||0, ucretDama: parseFloat(ucretDama)||0, ucretCimento: parseFloat(ucretCimento)||0, ucretCimentoIndirme: parseFloat(ucretCimentoIndirme)||0 };
+      const yeniAyarlar: Ayarlar = { ...ay, ucret10: parseFloat(ucretUretim)||0, ucret15: parseFloat(ucretUretim)||0, ucret20: parseFloat(ucretUretim)||0, ucretYukleme: parseFloat(ucretYukleme)||0, ucretBosaltma: parseFloat(ucretBosaltma)||0, ucretDama: parseFloat(ucretDama)||0, ucretCimento: parseFloat(ucretCimento)||0, ucretCimentoIndirme: parseFloat(ucretCimentoIndirme)||0 };
       onSave({ ...data, ayarlar: yeniAyarlar });
       await saveAyarlar(yeniAyarlar);
       showToast('Ücret tarifeleri kaydedildi ✓');
@@ -170,10 +171,8 @@ export default function AyarlarPage({ data, onSave, showToast, onBackupAlindi }:
           <div className="panel" style={{ maxWidth: 560 }}>
             <div className="panel-header"><div className="panel-title">Üretim Ücretleri (adet başı ₺)</div></div>
             <div className="panel-body">
-              <div className="frow c3">
-                <div><label>10&apos;luk Briket</label><input type="number" step="0.01" value={ucret10} onChange={e => setUcret10(e.target.value)} /></div>
-                <div><label>15&apos;lik Briket</label><input type="number" step="0.01" value={ucret15} onChange={e => setUcret15(e.target.value)} /></div>
-                <div><label>20&apos;lik Briket</label><input type="number" step="0.01" value={ucret20} onChange={e => setUcret20(e.target.value)} /></div>
+              <div className="frow">
+                <div><label>Adet Başı Ücret (TL)</label><input type="number" step="0.01" value={ucretUretim} onChange={e => setUcretUretim(e.target.value)} /></div>
               </div>
             </div>
           </div>
