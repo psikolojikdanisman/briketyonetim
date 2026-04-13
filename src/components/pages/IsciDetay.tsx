@@ -140,14 +140,14 @@ export default function IsciDetay({ data, onSave, showToast, isciId, onGeri }: I
     const kalanSonra     = Math.max(0, sonOdeme.tumKazanc - sonOdeme.tumOdenenOncesi - sonOdeme.tutar);
     const haftaKalanSonra = Math.max(0, sonOdeme.haftaKazanc - sonOdeme.haftaOdenenOncesi - sonOdeme.tutar);
     makbuzIndir({
-      baslik: 'ISCI ODEME MAKBUZU', makbuzNo: sonOdeme.no, tarih: sonOdeme.tarih,
+      baslik: 'İŞÇİ ÖDEME MAKBUZU', makbuzNo: sonOdeme.no, tarih: sonOdeme.tarih,
       alici: sonOdeme.isciIsim, aciklama: sonOdeme.aciklama || undefined,
       kalemler: [
-        { etiket: 'Bu Hafta Toplam Kazanc', deger: tl(sonOdeme.haftaKazanc) },
-        { etiket: 'Bu Hafta Onceki Odemeler', deger: tl(sonOdeme.haftaOdenenOncesi) },
-        { etiket: 'Bu Hafta Kalan (Bu Odeme Sonrasi)', deger: tl(haftaKalanSonra) },
-        { etiket: 'Tum Zamanlar Kazanc', deger: tl(sonOdeme.tumKazanc) },
-        { etiket: 'Tum Zamanlar Odenen', deger: tl(sonOdeme.tumOdenenOncesi) },
+        { etiket: 'Bu Hafta Toplam Kazanç', deger: tl(sonOdeme.haftaKazanc) },
+        { etiket: 'Bu Hafta Önceki Ödemeler', deger: tl(sonOdeme.haftaOdenenOncesi) },
+        { etiket: 'Bu Hafta Kalan (Bu Ödeme Sonrası)', deger: tl(haftaKalanSonra) },
+        { etiket: 'Tüm Zamanlar Kazanç', deger: tl(sonOdeme.tumKazanc) },
+        { etiket: 'Tüm Zamanlar Ödenen', deger: tl(sonOdeme.tumOdenenOncesi) },
       ],
       odemeTutari: tl(sonOdeme.tutar),
       kalanBorc: kalanSonra > 0 ? tl(kalanSonra) : undefined,

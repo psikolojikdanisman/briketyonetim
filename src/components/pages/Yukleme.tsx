@@ -44,13 +44,30 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
   const [yukErrors, setYukErrors] = useState<{ miktar?: boolean; isciler?: boolean }>({});
   const [noktaErrors, setNoktaErrors] = useState<Record<number, { miktar?: boolean; isciler?: boolean }>>({});
 
+  // Cimento yukleme
+  const [cimentoVar, setCimentoVar] = useState(false);
+  const [cimentoMiktar, setCimentoMiktar] = useState('');
+  const [cimentoYukIsciler, setCimentoYukIsciler] = useState<number[]>([]);
+
+  // Cimento indirme
+  const [cimentoIndirmeIsciler, setCimentoIndirmeIsciler] = useState<number[]>([]);
+
   const a = data.ayarlar;
-  const ucretYukleme  = a.ucretYukleme  || 0;
-  const ucretBosaltma = a.ucretBosaltma || 0;
-  const ucretDama     = a.ucretDama     || 0;
+  const ucretYukleme    = a.ucretYukleme    || 0;
+  const ucretBosaltma   = a.ucretBosaltma   || 0;
+  const ucretDama       = a.ucretDama       || 0;
+  const ucretCimento    = a.ucretCimento    || 0;
+  const ucretCimentoInd = a.ucretCimentoIndirme || 0;
+
   const yukM = parseFloat(yukMiktar) || 0;
   const yukToplamUcret   = yukM * ucretYukleme;
   const yukKisiBasiUcret = yukIsciler.length > 0 ? yukToplamUcret / yukIsciler.length : 0;
+
+  const cimentoM      = parseFloat(cimentoMiktar) || 0;
+  const cimentoYukTop = cimentoM * ucretCimento;
+  const cimentoYukKbp = cimentoYukIsciler.length > 0 ? cimentoYukTop / cimentoYukIsciler.length : 0;
+  const cimentoIndTop = cimentoM * ucretCimentoInd;
+  const cimentoIndKbp = cimentoIndirmeIsciler.length > 0 ? cimentoIndTop / cimentoIndirmeIsciler.length : 0;
 
   function noktaHesap(n: IndirmeNokta) {
     const m   = parseFloat(n.miktar) || 0;
@@ -67,20 +84,23 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
     setYukIsciler(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
     if (yukErrors.isciler) setYukErrors(e => ({ ...e, isciler: false }));
   }
-
+  function toggleCimentoYukIsci(id: number) {
+    setCimentoYukIsciler(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  }
+  function toggleCimentoIndIsci(id: number) {
+    setCimentoIndirmeIsciler(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  }
   function toggleNoktaIsci(nid: number, isciId: number) {
     setNoktalar(prev => prev.map(n => n.id !== nid ? n : { ...n, isciler: n.isciler.includes(isciId) ? n.isciler.filter(x => x !== isciId) : [...n.isciler, isciId] }));
     setNoktaErrors(prev => ({ ...prev, [nid]: { ...prev[nid], isciler: false } }));
   }
-
   function noktaGuncelle<K extends keyof IndirmeNokta>(nid: number, key: K, val: IndirmeNokta[K]) {
     setNoktalar(prev => prev.map(n => n.id !== nid ? n : { ...n, [key]: val }));
     if (key === 'miktar') setNoktaErrors(prev => ({ ...prev, [nid]: { ...prev[nid], miktar: false } }));
   }
-
   function noktaEkle() { setNoktalar(prev => [...prev, yeniNokta([...yukIsciler], yukMiktar)]); }
   function noktaSil(nid: number) {
-    if (noktalar.length <= 1) { showToast('En az 1 indirme noktası olmalı', false); return; }
+    if (noktalar.length <= 1) { showToast('En az 1 indirme noktasi olmali', false); return; }
     setNoktalar(prev => prev.filter(n => n.id !== nid));
     setNoktaErrors(prev => { const next = { ...prev }; delete next[nid]; return next; });
   }
@@ -89,7 +109,9 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
     const newErrors = { miktar: !yukM || yukM <= 0, isciler: yukIsciler.length === 0 };
     setYukErrors(newErrors);
     if (newErrors.miktar) { showToast('Miktar gerekli', false); return; }
-    if (newErrors.isciler) { showToast('En az 1 yükleme işçisi seçin', false); return; }
+    if (newErrors.isciler) { showToast('En az 1 yukleme iscisi secin', false); return; }
+    if (cimentoVar && cimentoM <= 0) { showToast('Cimento miktari gerekli', false); return; }
+    if (cimentoVar && cimentoYukIsciler.length === 0) { showToast('Cimento yukleme icin en az 1 isci secin', false); return; }
     setNoktalar(prev => prev.map((n, i) => i === 0 ? { ...n, miktar: yukMiktar, isciler: [...yukIsciler] } : n));
     setAdim('indirme');
   }
@@ -99,14 +121,20 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
       const newErrors = { miktar: !yukM || yukM <= 0, isciler: yukIsciler.length === 0 };
       setYukErrors(newErrors);
       if (newErrors.miktar) { showToast('Miktar gerekli', false); return; }
-      if (newErrors.isciler) { showToast('En az 1 işçi seçin', false); return; }
+      if (newErrors.isciler) { showToast('En az 1 isci secin', false); return; }
+      if (cimentoVar && cimentoM <= 0) { showToast('Cimento miktari gerekli', false); return; }
+      if (cimentoVar && cimentoYukIsciler.length === 0) { showToast('Cimento yukleme icin en az 1 isci secin', false); return; }
       const kayit: Yukleme = { id: uid(), tarih, tur: 'yukleme', miktar: yukM, isciler: yukIsciler, kisiBasiUcret: yukKisiBasiUcret, toplamUcret: yukToplamUcret, not: yukNot };
-      onSave({ ...data, yuklemeler: [...data.yuklemeler, kayit] });
-      await saveYukleme(kayit);
+      const yeniKayitlar: Yukleme[] = [kayit];
+      if (cimentoVar && cimentoM > 0 && cimentoYukIsciler.length > 0) {
+        yeniKayitlar.push({ id: uid(), tarih, tur: 'cimento', miktar: cimentoM, isciler: cimentoYukIsciler, kisiBasiUcret: cimentoYukKbp, toplamUcret: cimentoYukTop, not: yukNot });
+      }
+      onSave({ ...data, yuklemeler: [...data.yuklemeler, ...yeniKayitlar] });
+      await Promise.all(yeniKayitlar.map(saveYukleme));
       resetForm();
-      showToast('Yükleme kaydedildi ✓');
+      showToast('Yukleme kaydedildi');
     } catch {
-      showToast('Yükleme kaydedilemedi', false);
+      showToast('Yukleme kaydedilemedi', false);
     }
   }
 
@@ -120,53 +148,66 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
         if (!m || m <= 0) { err.miktar = true; hasError = true; }
         if (n.isciler.length === 0) { err.isciler = true; hasError = true; }
         if (Object.keys(err).length) newNoktaErrors[n.id] = err;
-        }
-        setNoktaErrors(newNoktaErrors);
-        if (hasError) { showToast('Tüm indirme noktalarını doldurun', false); return; }
-        const yukId = uid();
-        const yukKayit: Yukleme = { id: yukId, tarih, tur: 'yukleme', miktar: yukM, isciler: yukIsciler, kisiBasiUcret: yukKisiBasiUcret, toplamUcret: yukToplamUcret, not: yukNot };
-        const indKayitlar: Yukleme[] = noktalar.map(n => {
-          const h = noktaHesap(n);
-          return { id: uid(), tarih, tur: n.tur === 'dama' ? 'dama_bosaltma' : 'bosaltma', miktar: h.m, isciler: n.isciler, kisiBasiUcret: h.kbp, toplamUcret: h.top, not: n.not || yukNot, yuklemeId: yukId } as Yukleme;
-        });
-        onSave({ ...data, yuklemeler: [...data.yuklemeler, yukKayit, ...indKayitlar] });
-        await saveYukleme(yukKayit);
-        await Promise.all(indKayitlar.map(saveYukleme));
-        resetForm();
-        showToast(`Yükleme + ${indKayitlar.length} indirme noktası kaydedildi ✓`);
+      }
+      setNoktaErrors(newNoktaErrors);
+      if (hasError) { showToast('Tum indirme noktalarini doldurun', false); return; }
+      if (cimentoVar && cimentoIndirmeIsciler.length === 0) { showToast('Cimento indirme icin en az 1 isci secin', false); return; }
+
+      const yukId = uid();
+      const yukKayit: Yukleme = { id: yukId, tarih, tur: 'yukleme', miktar: yukM, isciler: yukIsciler, kisiBasiUcret: yukKisiBasiUcret, toplamUcret: yukToplamUcret, not: yukNot };
+      const indKayitlar: Yukleme[] = noktalar.map(n => {
+        const h = noktaHesap(n);
+        return { id: uid(), tarih, tur: n.tur === 'dama' ? 'dama_bosaltma' : 'bosaltma', miktar: h.m, isciler: n.isciler, kisiBasiUcret: h.kbp, toplamUcret: h.top, not: n.not || yukNot, yuklemeId: yukId } as Yukleme;
+      });
+      const tumKayitlar: Yukleme[] = [yukKayit, ...indKayitlar];
+      if (cimentoVar && cimentoM > 0 && cimentoYukIsciler.length > 0) {
+        tumKayitlar.push({ id: uid(), tarih, tur: 'cimento', miktar: cimentoM, isciler: cimentoYukIsciler, kisiBasiUcret: cimentoYukKbp, toplamUcret: cimentoYukTop, not: yukNot, yuklemeId: yukId } as Yukleme);
+      }
+      if (cimentoVar && cimentoM > 0 && cimentoIndirmeIsciler.length > 0) {
+        tumKayitlar.push({ id: uid(), tarih, tur: 'cimento_indirme', miktar: cimentoM, isciler: cimentoIndirmeIsciler, kisiBasiUcret: cimentoIndKbp, toplamUcret: cimentoIndTop, not: yukNot, yuklemeId: yukId } as Yukleme);
+      }
+      onSave({ ...data, yuklemeler: [...data.yuklemeler, ...tumKayitlar] });
+      await Promise.all(tumKayitlar.map(saveYukleme));
+      resetForm();
+      showToast('Yukleme + ' + indKayitlar.length + ' indirme noktasi kaydedildi');
     } catch {
-      showToast('Kayıt kaydedilemedi', false);
+      showToast('Kayit kaydedilemedi', false);
     }
   }
+
   function resetForm() {
     setAdim('yukleme'); setYukMiktar(''); setYukNot(''); setYukIsciler([]);
     setNoktalar([yeniNokta()]); setYukErrors({}); setNoktaErrors({});
+    setCimentoVar(false); setCimentoMiktar(''); setCimentoYukIsciler([]); setCimentoIndirmeIsciler([]);
   }
+
   async function silYukleme(yukId: number) {
     try {
       const silinecekler = data.yuklemeler.filter(y => {
         if (y.id === yukId) return true;
         const asExt = y as Yukleme & { yuklemeId?: number };
         return asExt.yuklemeId === yukId;
-        });
-        const filtered = data.yuklemeler.filter(y => {
-          if (y.id === yukId) return false;
-          const asExt = y as Yukleme & { yuklemeId?: number };
-          return asExt.yuklemeId !== yukId;
-        });
-        onSave({ ...data, yuklemeler: filtered });
-        await Promise.all(silinecekler.map(y => deleteYukleme(y.id)));
-        setAcikYukleme(null);
-        showToast('Kayıt silindi');
+      });
+      const filtered = data.yuklemeler.filter(y => {
+        if (y.id === yukId) return false;
+        const asExt = y as Yukleme & { yuklemeId?: number };
+        return asExt.yuklemeId !== yukId;
+      });
+      onSave({ ...data, yuklemeler: filtered });
+      await Promise.all(silinecekler.map(y => deleteYukleme(y.id)));
+      setAcikYukleme(null);
+      showToast('Kayit silindi');
     } catch {
-      showToast('Kayıt silinemedi', false);
+      showToast('Kayit silinemedi', false);
     }
   }
+
   const adimRenk = (hedef: Adim) => adim === hedef ? 'var(--accent)' : adim === 'indirme' && hedef === 'yukleme' ? 'var(--green)' : 'var(--text3)';
   const sadecYuklemeler = [...data.yuklemeler].filter(y => y.tur === 'yukleme').sort((a, b) => b.tarih.localeCompare(a.tarih));
   function indirmeleriGetir(yukId: number) {
     return data.yuklemeler.filter(y => { if (y.tur === 'yukleme') return false; return (y as Yukleme & { yuklemeId?: number }).yuklemeId === yukId; });
   }
+
   return (
     <div>
     <div className="panel" style={{ marginBottom: 16 }}>
@@ -184,7 +225,7 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
             <div className="frow c2">
               <div><label>Tarih</label><input type="date" value={tarih} onChange={e => setTarih(e.target.value)} /></div>
               <div>
-                <label>Miktar (adet)</label>
+                <label>Briket Miktarı (adet)</label>
                 <input type="number" min="1" placeholder="ör: 5000" value={yukMiktar} onChange={e => { setYukMiktar(e.target.value); if (yukErrors.miktar) setYukErrors(er => ({ ...er, miktar: false })); }} style={{ borderColor: yukErrors.miktar ? 'var(--red)' : undefined }} />
                 {yukErrors.miktar && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 3 }}>Geçerli bir miktar girin</div>}
               </div>
@@ -196,7 +237,7 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                 {yukErrors.isciler && <div style={{ color: 'var(--red)', fontSize: 11, marginBottom: 4 }}>En az 1 işçi seçilmeli</div>}
                 <div className="check-list" style={{ borderColor: yukErrors.isciler ? 'var(--red)' : undefined, borderWidth: yukErrors.isciler ? 1 : undefined, borderStyle: yukErrors.isciler ? 'solid' : undefined, borderRadius: yukErrors.isciler ? 'var(--radius)' : undefined, padding: yukErrors.isciler ? 6 : undefined }}>
                   {data.isciler.length === 0 ? <span style={{ color: 'var(--text3)', fontSize: 12 }}>Önce işçi ekleyin</span> : data.isciler.map(i => (
-                    <div key={i.id} className={`check-item${yukIsciler.includes(i.id) ? ' selected' : ''}`} onClick={() => toggleYuk(i.id)}><div className="dot" />{i.isim}</div>
+                    <div key={i.id} className={'check-item' + (yukIsciler.includes(i.id) ? ' selected' : '')} onClick={() => toggleYuk(i.id)}><div className="dot" />{i.isim}</div>
                   ))}
                 </div>
               </div>
@@ -210,6 +251,48 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                 <div className="calc-row total"><span>Kişi başı ücret</span><span>{tl(yukKisiBasiUcret)}</span></div>
               </div>
             )}
+
+            {/* Cimento Secenegi */}
+            <div style={{ marginBottom: 12 }}>
+              <div
+                className={'check-item' + (cimentoVar ? ' selected' : '')}
+                style={{ display: 'inline-flex', marginBottom: 8 }}
+                onClick={() => { setCimentoVar(v => !v); setCimentoMiktar(''); setCimentoYukIsciler([]); setCimentoIndirmeIsciler([]); }}
+              >
+                <div className="dot" /> Bu seferde çimento da var
+              </div>
+              {cimentoVar && (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 14px', background: 'var(--surface2)', display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
+                  <div>
+                    <label>Çimento Miktarı (torba)</label>
+                    <input type="number" min="1" placeholder="ör: 100" value={cimentoMiktar} onChange={e => setCimentoMiktar(e.target.value)} />
+                  </div>
+                  <div>
+                    <label>Çimento Yükleyen İşçiler</label>
+                    <div className="field-hint" style={{ marginBottom: 6 }}>
+                      Birim ücret: {ucretCimento > 0 ? <strong style={{ color: 'var(--accent)' }}>{ucretCimento.toFixed(3)} TL/torba</strong> : <span style={{ color: 'var(--red)' }}>Ayarlar sayfasından girin</span>}
+                    </div>
+                    <div className="check-list">
+                      {data.isciler.map(i => (
+                        <div key={i.id} className={'check-item' + (cimentoYukIsciler.includes(i.id) ? ' selected' : '')} onClick={() => toggleCimentoYukIsci(i.id)}>
+                          <div className="dot" />{i.isim}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {cimentoM > 0 && cimentoYukIsciler.length > 0 && (
+                    <div className="calc-preview" style={{ marginBottom: 0 }}>
+                      <div className="calc-row"><span>Çimento miktarı</span><span>{cimentoM.toLocaleString('tr-TR')} torba</span></div>
+                      <div className="calc-row"><span>Birim ücret (yükleme)</span><span>{ucretCimento.toFixed(3)} TL/torba</span></div>
+                      <div className="calc-row"><span>Toplam havuz</span><span>{tl(cimentoYukTop)}</span></div>
+                      <div className="calc-row"><span>İşçi sayısı</span><span>{cimentoYukIsciler.length} kişi</span></div>
+                      <div className="calc-row total"><span>Kişi başı ücret</span><span>{tl(cimentoYukKbp)}</span></div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="frow"><div><label>Araç / Not</label><input type="text" placeholder="Plaka, şoför, müşteri..." value={yukNot} onChange={e => setYukNot(e.target.value)} /></div></div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button className="btn btn-primary" onClick={adim1Ileri}>İndirme Adımına Geç →</button>
@@ -220,18 +303,22 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
         {adim === 'indirme' && (
           <>
             <div style={{ background: 'rgba(46,196,182,.06)', border: '1px solid rgba(46,196,182,.2)', borderRadius: 'var(--radius)', padding: '10px 16px', marginBottom: 16, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', color: 'var(--text3)' }}>
-              ① YÜKLEME &nbsp;<span style={{ color: 'var(--accent)' }}>{yukM.toLocaleString('tr-TR')} adet</span>&nbsp;·&nbsp;
+              YUKLEME &nbsp;<span style={{ color: 'var(--accent)' }}>{yukM.toLocaleString('tr-TR')} adet</span>&nbsp;·&nbsp;
               <span style={{ color: 'var(--green)' }}>{tl(yukToplamUcret)}</span>&nbsp;·&nbsp;
               <span style={{ color: 'var(--text2)' }}>{yukIsciler.map(id => data.isciler.find(i => i.id === id)?.isim || '?').join(', ')}</span>
+              {cimentoVar && cimentoM > 0 && (
+                <span style={{ marginLeft: 12, color: 'var(--amber)' }}>+ Cimento: {cimentoM} torba</span>
+              )}
             </div>
+
             {noktalar.map((n, idx) => {
               const h = noktaHesap(n);
               const nm = parseFloat(n.miktar) || 0;
               const nErr = noktaErrors[n.id] || {};
               return (
-                <div key={n.id} style={{ border: `1px solid ${(nErr.miktar || nErr.isciler) ? 'var(--red)' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 12, background: 'var(--surface2)' }}>
+                <div key={n.id} style={{ border: '1px solid ' + ((nErr.miktar || nErr.isciler) ? 'var(--red)' : 'var(--border)'), borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 12, background: 'var(--surface2)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>{idx + 1}. İNDİRME NOKTASI</div>
+                    <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>{idx + 1}. BRİKET İNDİRME NOKTASI</div>
                     {noktalar.length > 1 && <button className="btn btn-danger btn-sm" onClick={() => noktaSil(n.id)}>✕ Kaldır</button>}
                   </div>
                   <div className="frow c2" style={{ marginBottom: 10 }}>
@@ -244,7 +331,7 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                       <label>İndirme Türü</label>
                       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                         {(['normal', 'dama'] as IndirmeTur[]).map(t => (
-                          <div key={t} className={`check-item${n.tur === t ? ' selected' : ''}`} style={{ flex: 1, justifyContent: 'center', padding: '7px 8px' }} onClick={() => noktaGuncelle(n.id, 'tur', t)}>
+                          <div key={t} className={'check-item' + (n.tur === t ? ' selected' : '')} style={{ flex: 1, justifyContent: 'center', padding: '7px 8px' }} onClick={() => noktaGuncelle(n.id, 'tur', t)}>
                             <div className="dot" />{t === 'normal' ? 'Normal' : 'Dama / Çatı'}
                           </div>
                         ))}
@@ -258,7 +345,7 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                     {nErr.isciler && <div style={{ color: 'var(--red)', fontSize: 11, marginBottom: 4 }}>En az 1 işçi seçilmeli</div>}
                     <div className="check-list" style={{ borderColor: nErr.isciler ? 'var(--red)' : undefined, borderWidth: nErr.isciler ? 1 : undefined, borderStyle: nErr.isciler ? 'solid' : undefined, borderRadius: nErr.isciler ? 'var(--radius)' : undefined, padding: nErr.isciler ? 6 : undefined }}>
                       {data.isciler.length === 0 ? <span style={{ color: 'var(--text3)', fontSize: 12 }}>Önce işçi ekleyin</span> : data.isciler.map(i => (
-                        <div key={i.id} className={`check-item${n.isciler.includes(i.id) ? ' selected' : ''}`} onClick={() => toggleNoktaIsci(n.id, i.id)}><div className="dot" />{i.isim}</div>
+                        <div key={i.id} className={'check-item' + (n.isciler.includes(i.id) ? ' selected' : '')} onClick={() => toggleNoktaIsci(n.id, i.id)}><div className="dot" />{i.isim}</div>
                       ))}
                     </div>
                   </div>
@@ -275,9 +362,38 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                 </div>
               );
             })}
-            <button className="btn btn-secondary" style={{ marginBottom: 16 }} onClick={noktaEkle}>+ İndirme Noktası Ekle</button>
+            <button className="btn btn-secondary" style={{ marginBottom: 16 }} onClick={noktaEkle}>+ Briket İndirme Noktası Ekle</button>
+
+            {cimentoVar && cimentoM > 0 && (
+              <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 12, background: 'var(--surface2)' }}>
+                <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: 'var(--amber)', fontWeight: 700, marginBottom: 12 }}>ÇİMENTO İNDİRME</div>
+                <div style={{ marginBottom: 10 }}>
+                  <label>Çimento İndiren İşçiler</label>
+                  <div className="field-hint" style={{ marginBottom: 6 }}>
+                    {cimentoM} torba · Birim ücret: {ucretCimentoInd > 0 ? <strong style={{ color: 'var(--accent)' }}>{ucretCimentoInd.toFixed(3)} TL/torba</strong> : <span style={{ color: 'var(--red)' }}>Ayarlardan girin</span>}
+                  </div>
+                  <div className="check-list">
+                    {data.isciler.map(i => (
+                      <div key={i.id} className={'check-item' + (cimentoIndirmeIsciler.includes(i.id) ? ' selected' : '')} onClick={() => toggleCimentoIndIsci(i.id)}>
+                        <div className="dot" />{i.isim}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {cimentoM > 0 && cimentoIndirmeIsciler.length > 0 && (
+                  <div className="calc-preview" style={{ marginBottom: 0 }}>
+                    <div className="calc-row"><span>Çimento miktarı</span><span>{cimentoM.toLocaleString('tr-TR')} torba</span></div>
+                    <div className="calc-row"><span>Birim ücret (indirme)</span><span>{ucretCimentoInd.toFixed(3)} TL/torba</span></div>
+                    <div className="calc-row"><span>Toplam havuz</span><span>{tl(cimentoIndTop)}</span></div>
+                    <div className="calc-row"><span>İşçi sayısı</span><span>{cimentoIndirmeIsciler.length} kişi</span></div>
+                    <div className="calc-row total"><span>Kişi başı ücret</span><span>{tl(cimentoIndKbp)}</span></div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {toplamIndMiktar > 0 && (
-              <div style={{ background: toplamIndMiktar > yukM ? 'rgba(224,112,112,.08)' : toplamIndMiktar < yukM ? 'rgba(106,176,216,.08)' : 'rgba(77,217,172,.08)', border: `1px solid ${toplamIndMiktar > yukM ? 'rgba(224,112,112,.3)' : toplamIndMiktar < yukM ? 'rgba(106,176,216,.3)' : 'rgba(77,217,172,.3)'}`, borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace' }}>
+              <div style={{ background: toplamIndMiktar > yukM ? 'rgba(224,112,112,.08)' : toplamIndMiktar < yukM ? 'rgba(106,176,216,.08)' : 'rgba(77,217,172,.08)', border: '1px solid ' + (toplamIndMiktar > yukM ? 'rgba(224,112,112,.3)' : toplamIndMiktar < yukM ? 'rgba(106,176,216,.3)' : 'rgba(77,217,172,.3)'), borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace' }}>
                 <span style={{ color: 'var(--text3)' }}>Toplam indirilen: </span>
                 <strong style={{ color: toplamIndMiktar > yukM ? 'var(--red)' : toplamIndMiktar < yukM ? 'var(--blue)' : 'var(--green)' }}>{toplamIndMiktar.toLocaleString('tr-TR')} / {yukM.toLocaleString('tr-TR')} adet</strong>
                 {toplamIndMiktar > yukM && <span style={{ color: 'var(--red)', marginLeft: 8 }}>⚠ Yükleme miktarını aştı</span>}
@@ -330,7 +446,7 @@ export default function YuklemePage({ data, onSave, showToast }: YuklemeProps) {
                       return (
                         <tr key={ind.id} style={{ background: 'rgba(46,196,182,.04)' }}>
                           <td style={{ borderLeft: '2px solid var(--accent)', paddingLeft: 10, color: 'var(--text3)', fontSize: 10, fontFamily: 'IBM Plex Mono, monospace' }}>└ {idx + 1}</td>
-                          <td><span className={`badge ${TUR_BADGE[ind.tur] || 'b-gray'}`} style={{ fontSize: 9 }}>{TUR_LABEL[ind.tur] || ind.tur}</span></td>
+                          <td><span className={'badge ' + (TUR_BADGE[ind.tur] || 'b-gray')} style={{ fontSize: 9 }}>{TUR_LABEL[ind.tur] || ind.tur}</span></td>
                           <td className="td-mono" style={{ fontSize: 11 }}>{ind.miktar.toLocaleString('tr-TR')}</td>
                           <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{indIsci}</td>
                           <td className="td-mono" style={{ fontSize: 11 }}>{tl(ind.kisiBasiUcret)}</td>

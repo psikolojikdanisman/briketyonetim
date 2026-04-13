@@ -9,6 +9,7 @@ export interface Yonetici {
 export interface Isci {
   id: number;
   isim: string;
+  tel?: string;
 }
 
 export interface Uretim {

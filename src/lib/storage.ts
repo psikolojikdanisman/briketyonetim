@@ -300,7 +300,7 @@ export async function topluGeriYukle(d: AppData): Promise<void> {
 // ─── TABLO BAZLI KAYIT / SİL ──────────────────────────────────────────────
 
 export async function saveIsci(x: Isci): Promise<void> {
-  const { error } = await supabase.from('isciler').upsert({ id: x.id, isim: x.isim });
+  const { error } = await supabase.from('isciler').upsert({ id: x.id, isim: x.isim, tel: x.tel });
   if (error) throw error;
 }
 export async function deleteIsci(id: number): Promise<void> {
@@ -503,7 +503,7 @@ export async function deleteGider(id: number): Promise<void> {
 
 
 function mapIsci(r: any): Isci {
-  return { id: r.id, isim: r.isim };
+  return { id: r.id, isim: r.isim, tel: r.tel };
 }
 
 function mapUretim(r: any): Uretim {

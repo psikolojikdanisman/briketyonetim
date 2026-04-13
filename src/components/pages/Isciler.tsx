@@ -19,6 +19,7 @@ interface IscilerProps {
 
 export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: IscilerProps) {
   const [isim, setIsim]             = useState('');
+  const [tel, setTel]               = useState('');
   const [avIsci, setAvIsci]         = useState('');
   const [avTutar, setAvTutar]       = useState('');
   const [avTarih, setAvTarih]       = useState(today());
@@ -36,7 +37,7 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
   async function isciEkle() {
     try {
       if (!isim.trim()) { showToast('İsim gerekli', false); return; }
-      const yeni = { id: uid(), isim: isim.trim() };
+      const yeni = { id: uid(), isim: isim.trim(), tel: tel.trim() || undefined };
       onSave({ ...data, isciler: [...data.isciler, yeni] });
       await saveIsci(yeni);
       setIsim('');
@@ -106,19 +107,38 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
     }
   }
 
+  function whatsappGonder() {
+    if (!sonOdeme) return;
+    const isci = data.isciler.find(i => i.id === sonOdeme.isciId);
+    const tel = isci?.tel?.replace(/\D/g, '');
+    if (!tel) { alert('Bu işçinin telefon numarası kayıtlı değil. İşçi listesinden ekleyin.'); return; }
+    const kalanSonra = Math.max(0, sonOdeme.tumKazanc - sonOdeme.tumOdenenOncesi - sonOdeme.tutar);
+    const mesaj = `İşçi Ödeme Makbuzu
+---
+Sayın ${sonOdeme.isciIsim},
+Tarih: ${sonOdeme.tarih.split('-').reverse().join('.')}
+Bu Hafta Kazanç: ${tl(sonOdeme.haftaKazanc)}
+Bu Hafta Ödenen: ${tl(sonOdeme.tutar)}
+Toplam Kalan Borç: ${kalanSonra > 0 ? tl(kalanSonra) : 'Yok'}
+---
+İdooğlu Briket`;
+    const url = `https://wa.me/90${tel.startsWith('0') ? tel.slice(1) : tel}?text=${encodeURIComponent(mesaj)}`;
+    window.open(url, '_blank');
+  }
+
   function isciMakbuzAc() {
     if (!sonOdeme) return;
     const kalanSonra  = Math.max(0, sonOdeme.tumKazanc - sonOdeme.tumOdenenOncesi - sonOdeme.tutar);
     const haftaKalan  = Math.max(0, sonOdeme.haftaKazanc - sonOdeme.haftaOdenenOncesi - sonOdeme.tutar);
     makbuzIndir({
-      baslik: 'ISCI ODEME MAKBUZU', makbuzNo: sonOdeme.no, tarih: sonOdeme.tarih,
+      baslik: 'İŞÇİ ÖDEME MAKBUZU', makbuzNo: sonOdeme.no, tarih: sonOdeme.tarih,
       alici: sonOdeme.isciIsim, aciklama: sonOdeme.aciklama || undefined,
       kalemler: [
-        { etiket: 'Bu Hafta Toplam Kazanc', deger: tl(sonOdeme.haftaKazanc) },
-        { etiket: 'Bu Hafta Onceki Odemeler', deger: tl(sonOdeme.haftaOdenenOncesi) },
-        { etiket: 'Bu Hafta Kalan (Bu Odeme Sonrasi)', deger: tl(haftaKalan) },
-        { etiket: 'Tum Zamanlar Kazanc', deger: tl(sonOdeme.tumKazanc) },
-        { etiket: 'Tum Zamanlar Odenen', deger: tl(sonOdeme.tumOdenenOncesi) },
+        { etiket: 'Bu Hafta Toplam Kazanç', deger: tl(sonOdeme.haftaKazanc) },
+        { etiket: 'Bu Hafta Önceki Ödemeler', deger: tl(sonOdeme.haftaOdenenOncesi) },
+        { etiket: 'Bu Hafta Kalan (Bu Ödeme Sonrası)', deger: tl(haftaKalan) },
+        { etiket: 'Tüm Zamanlar Kazanç', deger: tl(sonOdeme.tumKazanc) },
+        { etiket: 'Tüm Zamanlar Ödenen', deger: tl(sonOdeme.tumOdenenOncesi) },
       ],
       odemeTutari: tl(sonOdeme.tutar),
       kalanBorc: kalanSonra > 0 ? tl(kalanSonra) : undefined,
@@ -161,7 +181,10 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
         <div className="panel">
           <div className="panel-header"><div className="panel-title">İşçi Ekle</div></div>
           <div className="panel-body">
-            <div className="frow"><div><label>Ad Soyad</label><input type="text" placeholder="İşçi adı" value={isim} onChange={e => setIsim(e.target.value)} onKeyDown={e => e.key === 'Enter' && isciEkle()} /></div></div>
+            <div className="frow c2">
+              <div><label>Ad Soyad</label><input type="text" placeholder="İşçi adı" value={isim} onChange={e => setIsim(e.target.value)} onKeyDown={e => e.key === 'Enter' && isciEkle()} /></div>
+              <div><label>Telefon</label><input type="tel" placeholder="05xx..." value={tel} onChange={e => setTel(e.target.value)} /></div>
+            </div>
             <button className="btn btn-primary" onClick={isciEkle}>+ Ekle</button>
           </div>
         </div>
@@ -191,6 +214,7 @@ export default function IscilerPage({ data, onSave, showToast, onIsciDetay }: Is
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn-success" onClick={avansKaydet}>✓ Ödeme Yap</button>
               {sonOdeme && <button className="btn btn-secondary" onClick={isciMakbuzAc}>📄 Makbuz PDF</button>}
+              {sonOdeme && <button className="btn btn-success" onClick={whatsappGonder}>📱 WhatsApp</button>}
             </div>
             {sonOdeme && (
               <div style={{ marginTop: 10, background: 'rgba(46,196,182,.07)', border: '1px solid rgba(46,196,182,.3)', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 12, color: 'var(--text2)' }}>
